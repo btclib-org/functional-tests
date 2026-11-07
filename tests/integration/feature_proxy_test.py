@@ -65,15 +65,17 @@ option, and that same argv is what refuses `-onlynet=onion` given alone,
 the way Core's `-listenonion=0` does.
 
 Core's check that `localaddresses` is empty is dropped: this adapter's
-own `-bind` already empties it without a proxy: measured against
-bitcoind `31.1`, `getnetworkinfo`'s `localaddresses` answers empty
-whether `-discover` is passed bare or given its disabling value.
+own `-bind` already empties it without a proxy: measured against the
+bitcoind release `node-integration.yml` pins, `getnetworkinfo`'s
+`localaddresses` answers empty whether `-discover` is passed bare or
+given its disabling value.
 
 Each node given a proxy is also started with `-dnsseed` off, as Core's
 own `write_config` (`test_framework/util.py`) starts every node: through
 a proxy, a regtest node asks for its chain's own `dummySeed.invalid.` as
 well, and that request can reach the proxy ahead of one of the test's
-own (measured against `31.1`).
+own (measured against the release `node-integration.yml` pins, the
+request reaching the proxy within a second of the start).
 
 Each `feature_proxy_<node>_test.py` module beside this one runs it,
 `tests/integration/conftest.py`'s own module docstring having how.

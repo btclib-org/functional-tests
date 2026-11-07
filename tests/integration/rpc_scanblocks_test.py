@@ -28,8 +28,9 @@ builds the genesis block's own filter with `BasicBlockFilter.from_block`
 and asks it to `match` both scripts, the single-element filter matching
 a script exactly where that script's ranged hash equals the coinbase
 output's. Core's refusal of a null `scanobjects` is its `master`'s
-wording, from the pinned commit on; `31.1` refuses the same call with a
-type error, and either refusal passes, each with its own code.
+wording, from the pinned commit on; a release before `v32.0` refuses the
+same call with a type error, and either refusal passes, each with its
+own code.
 
 The second node is independent of the first -- never connected, never
 synced -- and asked for nothing but the refusal, so it is its own test
@@ -89,7 +90,8 @@ _FALSE_POSITIVE_SPK = bytes.fromhex("001400000000000000000000000000000000000cadc
 
 # `scanblocks "start" null`'s own refusal: Core's `master` since
 # `aeca0610865e` checks for the missing argument before reading it, and
-# `31.1` reads it as an array first and refuses the null's type
+# a release before `v32.0` reads it as an array first and refuses the
+# null's type
 _NULL_SCANOBJECTS_MASTER = "scanobjects argument is required for the start action"
 _NULL_SCANOBJECTS_RELEASE = "JSON value of type null is not of expected type array"
 
@@ -229,7 +231,7 @@ def scanblocks_finds_the_blocks_paying_what_it_is_asked_for(
         node.rpc.call("scanblocks", ["foobar"])
     assert excinfo.value.code == -8
     # null scanobjects: Core's `master` names the missing argument, and
-    # `31.1` refuses the null as a type error
+    # a release before `v32.0` refuses the null as a type error
     with pytest.raises(RpcError) as excinfo:
         node.rpc.call("scanblocks", ["start", None])
     refusal = excinfo.value

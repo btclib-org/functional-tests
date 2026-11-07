@@ -178,24 +178,25 @@ xfail_strict = true
 # pytest-timeout fails it by name: a hang on a node's process, socket or
 # RPC otherwise runs on until the workflow's own `timeout-minutes` ends
 # the job with no test named (section 7 of the organization standard).
-# Measured on 2026-09-26 against bitcoind 31.1 and the released
-# btclib-node at once, on a machine other sessions were loading, under
-# `-n auto` and again under `-n 2`:
+# Measured on 2026-11-07 against the bitcoind release
+# `node-integration.yml` pins and the released btclib-node at once, on a
+# machine other sessions were loading:
 #
 #   TF2_INTEGRATION=1 TF2_BITCOIND=<bitcoind> \
 #       TF2_BTCLIB_NODE_PYTHON=<python> \
-#       uv run pytest tests/integration --no-cov --durations=15
+#       uv run pytest tests/integration --no-cov --durations=15 -n 3
 #
-# the slowest were btclib-node tests failing on a `peer.py` wait at its
-# default deadline, 34.27s at most, and the slowest passing one was
-# `p2p_invalid_locator_bitcoind_test.py::test_max_locator_size`, 18.85s.
-# The bound sits far above the defaults `node.py` and `peer.py` give
-# their waits, so a missed deadline still fails naming the condition it
-# waited on rather than as a timeout; `tests/integration/conftest.py`'s
-# own `pytest_configure` scales it by `--timeout-factor` along with them.
-# A test with a wait of Core's own at or past the bound marks itself
-# `scaled_timeout`, and `pytest_collection_modifyitems` gives it the
-# `timeout` it names, scaled the same way.
+# the slowest were btclib-node tests failing on a `node.py` wait at its
+# default deadline, 63.40s at most, and the slowest passing one was
+# `test_a_kept_connection_outlives_the_default_server_timeout` in
+# `adapter_lifecycle_bitcoind_test.py`, 35.40s. The bound sits far above
+# the defaults `node.py` and `peer.py` give their waits, so a missed
+# deadline still fails naming the condition it waited on rather than as a
+# timeout; `tests/integration/conftest.py`'s own `pytest_configure`
+# scales it by `--timeout-factor` along with them. A test with a wait of
+# Core's own at or past the bound marks itself `scaled_timeout`, and
+# `pytest_collection_modifyitems` gives it the `timeout` it names, scaled
+# the same way.
 timeout = 300
 filterwarnings = ["error"]
 # --strict-markers is on, so a marker is declared here or it is a typo.

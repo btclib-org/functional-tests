@@ -20,10 +20,11 @@ asks for `Capability.DEBUG_LOG` and reads bitcoind's `HTTPResponse` lines,
 written under the `-debug=http` `BitcoindAdapter` starts with.
 
 Core's own HTTP server is in bitcoind from bitcoin/bitcoin#35182, which
-a release before `v32.0` does not carry. `31.1`, measured, answers 404
-to a request whose short header lines pass the limit only together, and
-writes no `HTTPResponse` line. The body reads the build's own
-`getnetworkinfo` `version`
+a release before `v32.0` does not carry. Such a release answers 404 to
+a request whose short header lines pass the limit only together, and
+writes no `HTTPResponse` line, as `node-integration.yml`'s `older-core`
+job measures against each release it runs. The body reads the build's
+own `getnetworkinfo` `version`
 ([ISS 35](https://github.com/btclib-org/functional-tests/issues/35)).
 On an older build the wire half asserts that 404, and the log half
 asserts no `HTTPResponse` line is written. `_HTTP_SERVER_VERSION`'s own

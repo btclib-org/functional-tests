@@ -24,19 +24,18 @@ table, at btclib-node's released `2026.9.24` and at its `main`
 (`25776772`) alike.
 
 Core starts every node on its cached 200-block chain; this mines 200
-blocks on the first node and submits them to the other two, a chain of
-the same height and not the same blocks, so Core's literal hash for the
+blocks on the first node and submits them to the other two, a chain of the
+same height and not the same blocks, so Core's literal hash for the
 fetched block is compared with the first node's own `getblockhash`
 instead. Core's `pruneblockchain` heights are literals too, and differ
-between `v31.1` and the pin (`git diff v31.1 779f4446803d --
-test/functional/rpc_getblockfrompeer.py`): `pruneblockchain` removes
-whole block files and answers the highest block left without data
+between `v30.3` and the pin (`git diff v30.3 779f4446803d --
+test/functional/rpc_getblockfrompeer.py`): `pruneblockchain` removes whole
+block files and answers the highest block left without data
 (`GetPruneHeight`, `src/rpc/blockchain.cpp`), so its answer moves with
-where each build's files end. This
-asserts what both sets of literals share instead: each prune height is
-under the height asked for and above the one before, the fetched block
-survives a prune height below the tip it was fetched at, and is pruned
-again by one at or past it.
+where each build's files end. This asserts what both sets of literals
+share instead: each prune height is under the height asked for and above
+the one before, the fetched block survives a prune height below the tip it
+was fetched at, and is pruned again by one at or past it.
 Each `rpc_getblockfrompeer_<node>_test.py` module beside this one runs it,
 `tests/integration/conftest.py`'s own module docstring having how.
 """

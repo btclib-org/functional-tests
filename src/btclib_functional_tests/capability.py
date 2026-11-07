@@ -197,10 +197,9 @@ class Capability(Enum):
     `-testactivationheight=<deployment>@<height>`. Regtest's own chain
     parameters activate every buried deployment otherwise -- BIP34, BIP66,
     BIP65 and CSV from height 1, segwit from genesis
-    (`src/kernel/chainparams.cpp`'s
-    own comment on each, "Always active unless overridden", measured
-    against `31.1`), so this is what lets a test hold one of
-    them back long enough to observe the boundary at all
+    (`src/kernel/chainparams.cpp`'s own comment on each, "Always active
+    unless overridden", at bitcoin/bitcoin@f0de87f040), so this is what lets
+    a test hold one of them back long enough to observe the boundary at all
     ([ISS functional-tests#14](https://github.com/btclib-org/functional-tests/issues/14)).
     `V2TRANSPORT` -- accept BIP324 v2 connections, the way Core's own
     `-v2transport` does: `getpeerinfo`'s `transport_protocol_type` reads

@@ -32,7 +32,7 @@ and descendant *count* sides.
 
 Each body restarts its node with `-limitclustercount=25` before any block
 is mined, as Core's file does, and expects `too-large-cluster` from each
-transaction of the package, the reason Core's file asserts at `v31.1` and
+transaction of the package, the reason Core's file asserts at `v32.1` and
 at `fa5f29774872` alike. A node that does not declare
 `Capability.LIMIT_CLUSTER_COUNT` is a counted skip.
 

@@ -10,8 +10,9 @@ this suite has no central test-framework object for Core's own
 Core's own `-v2transport` flag, node by node, here through
 `NodeAdapter.restart`'s own `extra_args` -- the same mechanism
 `feature_uacomment_test.py` uses for `-uacomment`. `getpeerinfo`'s own
-`transport_protocol_type` is what a real connection answers with,
-measured live against `31.1` for both values of the flag.
+`transport_protocol_type` is what a real connection answers with, measured
+live against the release `node-integration.yml` pins for both values of the
+flag.
 
 Each `v2transport_option_<node>_test.py` module beside this one runs each body,
 `tests/integration/conftest.py`'s own module docstring having how.

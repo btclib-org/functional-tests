@@ -33,9 +33,10 @@ node it starts and `BitcoindAdapter` does not. `-v2transport=0` is
 connection whose first message is not `version` is taken for a BIP324
 one, and the node answers the `ping` of the peer that never sent
 `version` with a v2 handshake rather than the log line Core asserts,
-measured against `31.1`. `-connect=0` is `write_config`'s own
-(`test_framework/util.py`, `disable_autoconnect`), leaving every
-connection the node holds one the test opened.
+measured against the release `node-integration.yml` pins. `-connect=0`
+is `write_config`'s own (`test_framework/util.py`,
+`disable_autoconnect`), leaving every connection the node holds one
+the test opened.
 
 Core's closing check, a start with `-peertimeout=0` refused with its own
 `expected_msg`, is a third test, matched against the whole of the node's

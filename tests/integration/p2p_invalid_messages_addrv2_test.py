@@ -46,12 +46,12 @@ other, and `std::shuffle` picks which, so `9.9.9.9` is added on some
 runs and not on others. `-connect=0` is what Core's own `write_config`
 (`test_framework/util.py`) gives every node, and what keeps
 `CConnman::Start` (`src/net.cpp`) from starting `ThreadOpenConnections`:
-measured against `31.1` without it, once `9.9.9.9` is in the
-address manager that thread selects it over and over, each selection
-one more `addrman` line in the log. The wire half starts one of these
-nodes too rather than using `bitcoind_adapter`, which a session shares:
-left holding the address, that node would write those lines for the
-rest of the session.
+measured against the release `node-integration.yml` pins without it,
+once `9.9.9.9` is in the address manager that thread selects it over and
+over, each selection one more `addrman` line in the log. The wire half
+starts one of these nodes too rather than using `bitcoind_adapter`,
+which a session shares: left holding the address, that node would write
+those lines for the rest of the session.
 
 btclib-node is started the same way, with `-connect=0`, so
 `P2pManager._maybe_dial_more_peers` (`p2p/manager.py`) returns before

@@ -49,8 +49,9 @@ Each log wait counts from the end of its block, as `assert_debug_log`
 (`debug_log.py`) counts it, where Core's counts from its start.
 
 Core's last step also passes with its `setmocktime` removed, here and
-under Core's own framework alike (measured against `31.1`):
-the node's own wait then passes on the real clock, inside the step's.
+under Core's own framework alike (measured against the release
+`node-integration.yml` pins): the node's own wait then passes on the
+real clock, inside the step's.
 
 Each `p2p_seednode_<node>_test.py` module beside this one runs it,
 `tests/integration/conftest.py`'s own module docstring having how.

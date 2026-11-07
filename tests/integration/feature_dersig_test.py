@@ -24,19 +24,19 @@ at Core's own height so that they have matured. Dropped from it is the
 debug-log wording of the block refusal, which `submitblock`'s own answer
 already carries.
 
-Kept, and read at bitcoind `31.1` rather than assumed:
-`getdeploymentinfo`'s own `bip66` entry, which transitions from inactive
-to active one block before the configured height -- the same "not
-active as of current tip, but the next block must obey rules" boundary
-Core's own file comments -- and the buried-deployment version floor
-Core's own file also checks with a version-2 block once BIP66 is
+Kept, and read at the bitcoind release `node-integration.yml` pins rather
+than assumed: `getdeploymentinfo`'s own `bip66` entry, which transitions
+from inactive to active one block before the configured height -- the
+same "not active as of current tip, but the next block must obey rules"
+boundary Core's own file comments -- and the buried-deployment version
+floor Core's own file also checks with a version-2 block once BIP66 is
 active, `bad-version(0x00000002)` both in `submitblock`'s own answer and
 in the node's own debug log (`ProcessNewBlock: AcceptBlock FAILED
 (bad-version(0x00000002), ...)`, `src/validation.cpp`'s own
-`ContextualCheckBlockHeader`). Not narrowed further than Core's own
-file on this specific check: measured live against `31.1`,
-a version-2 block is refused the same way both before and after BIP66's
-own configured height, BIP65's own default floor (`-testactivationheight`
+`ContextualCheckBlockHeader`). Not narrowed further than Core's own file
+on this specific check: measured live against that release, a version-2
+block is refused the same way both before and after BIP66's own
+configured height, BIP65's own default floor (`-testactivationheight`
 touching only the deployment it names) already requiring version 4 from
 height 1 -- so Core's own file does not attempt the before/after
 comparison for this check either, only the after-activation refusal.

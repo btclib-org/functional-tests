@@ -58,7 +58,7 @@ What differs from Core's file:
   paying `OP_TRUE`.
 
 Core's file at `v32.1` differs from the pin only in lacking the last
-step above, and at `v31.1` also in handing each `create_block` a
+step above, and at `v30.3` also in handing each `create_block` a
 coinbase of its own `create_coinbase` rather than a height, and in
 writing its `test_function` predicates as lambdas. Every release this
 suite runs answers that step as the pin does: an unconnecting header

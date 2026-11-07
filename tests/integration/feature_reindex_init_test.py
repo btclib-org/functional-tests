@@ -16,16 +16,17 @@ back to the height it had. `blocks/` is Core's own layout
 chain every node of this suite starts on by default.
 
 Core's own claim in full but for the refusal's stderr, read per-build
-below. Its chain is the framework's cached one; this
-node mines its own to the same height (`Capability.MINE`). The node is
-built over a data directory of its own, through `make_adapter`
+below. Its chain is the framework's cached one; this node mines its own
+to the same height (`Capability.MINE`). The node is built over a data
+directory of its own, through `make_adapter`
 (`tests/integration/conftest.py`), since the test removes a directory
 inside it. Core's harness waits, after a start, for `getmempoolinfo`'s
 `loaded`, "for the node to finish reindex, block import, and loading the
 mempool" (`TestNode.wait_for_rpc_connection`'s own comment), where
 `NodeAdapter.start` returns on the first RPC answer. This waits the same
 way before reading the height: without the wait, `getblockcount` answered
-`0` right after the start, measured against `31.1`.
+short of that height right after the start, measured against the release
+`node-integration.yml` pins.
 
 A bitcoind before `v31.0` prints `": "` ahead of that message, `noui`
 having added the empty caption and its separator
@@ -65,8 +66,8 @@ _HEIGHT = 200
 
 # how many blocks one `mine` call asks for, as `rpc_getblockfrompeer_test`
 # chunks them: a bitcoind's own `generatetoaddress` answers only once every
-# block is mined, and the whole height in one call outlasted the RPC
-# client's own timeout on `31.1`, measured on a loaded machine
+# block is mined, so one call has to finish inside the RPC client's own
+# timeout ([ISS 226](https://github.com/btclib-org/functional-tests/issues/226))
 _MINE_CHUNK = 50
 
 # Core's own `expected_msg`

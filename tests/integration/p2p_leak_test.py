@@ -19,8 +19,9 @@ commands reach a peer. BIP339 requires `wtxidrelay` for a peer at 70016 or
 higher, and BIP434 forbids a `feature` to a peer below 70017. No BIP fixes
 the rest: Core withholds `wtxidrelay` below 70016, and sends `sendaddrv2`
 only from 70016, as a courtesy to nodes that reject messages they do not
-know (BIP155 sets no minimum version; `net_processing.cpp`, `v31.1`). The
-body holds a node to Core's behaviour there.
+know (BIP155 sets no minimum version; `src/net_processing.cpp`,
+bitcoin/bitcoin@f0de87f040). The body holds a node to Core's behaviour
+there.
 
 It is Core's two peers that send a `version` and no `verack`, at 70015 and
 at exactly 70016

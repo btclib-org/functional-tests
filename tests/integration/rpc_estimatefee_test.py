@@ -21,8 +21,8 @@ each read off the node's own `help estimatesmartfee` by `_help_names`:
 
 - `estimatesmartfee`'s `options` argument, from bitcoin/bitcoin#34075,
   is asked of a node whose help lists it as `_OPTIONS_ARGUMENT` does. A
-  node without it is asked what Core's file at `v31.1` asks
-  instead, a third argument refused as one too many;
+  node without it is asked what Core's file at `v30.3` asks instead, a
+  third argument refused as one too many;
 - the refusal of an unknown `fee_rate_estimator`, from
   bitcoin/bitcoin#36365, is asked of a node whose help gives `auto` as
   that option's default, as `_AUTO_DEFAULT` does: the commit adding the

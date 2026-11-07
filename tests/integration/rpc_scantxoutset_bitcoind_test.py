@@ -39,11 +39,10 @@ pytestmark = pytest.mark.integration
 # own `getnetworkinfo` `version`, at or past which `scantxoutset` refuses
 # `start` with a null scan-object list as the missing argument: `v32.0`'s,
 # `v32.0rc1` being the first tag carrying
-# `aeca0610865ede44004b42a16ef6318245fe0644`, which `31.1`
-# lacks. A known limit: a `master` build from its merge (`3db96eb5fd`,
-# 2026-08-05) until the version moved to `32.99` (`f3fec67c3e`,
-# 2026-09-11) reports `319900` and refuses it that way all the same, so
-# this test fails against such a build
+# `aeca0610865ede44004b42a16ef6318245fe0644`. A known limit: a `master`
+# build from its merge (`3db96eb5fd`, 2026-08-05) until the version moved
+# to `32.99` (`f3fec67c3e`, 2026-09-11) reports `319900` and refuses it
+# that way all the same, so this test fails against such a build
 _NULL_AS_MISSING_VERSION = 320000
 
 

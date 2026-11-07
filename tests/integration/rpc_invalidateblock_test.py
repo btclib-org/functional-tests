@@ -47,7 +47,7 @@ What differs from Core's file:
   change's merge,
   bitcoin/bitcoin@a40e9536588c366886de4f4b9d67b8665a509929.
 
-Core's file at `v32.1` is the pin's. Every step is the same at `v31.1`:
+Core's file at `v32.1` is the pin's. Every step is the same at `v30.3`:
 Core's file there differs from the pinned revision only in how it hands
 `create_block` a coinbase and a time.
 

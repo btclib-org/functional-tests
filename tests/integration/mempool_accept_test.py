@@ -23,8 +23,8 @@ starts it with before any block is mined.
 Where the build's own `getnetworkinfo` `version` reads older
 ([ISS 35](https://github.com/btclib-org/functional-tests/issues/35)),
 each allowed transaction is expected without them, as Core's file at
-`v31.1` expects it. `_VSIZE_FIELDS_VERSION`'s own comment has the known
-limit.
+`v30.3` expects it. `_VSIZE_FIELDS_VERSION`'s own comment has the
+known limit.
 
 A build without bitcoin/bitcoin#32406, read by `mempool_datacarrier_test.py`'s
 `uncapped_by_default`, relays one null-data output per transaction: there

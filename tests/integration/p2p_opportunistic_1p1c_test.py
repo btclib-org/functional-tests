@@ -99,17 +99,17 @@ What differs from Core's file besides:
 
 Core's node starts with `-inboundrelaypercent=100` besides, an option
 bitcoin/bitcoin@0bd3d3dfa562724e3dbc4cec2d4290e4561655cd adds and
-`v32.0rc1` is the first tag to carry, and which `v31.1` refuses as
-unknown. Here the check sending many orphans, the one connecting the
-most inbound peers, passes it to a bitcoind whose `getnetworkinfo`
-`version` reads at or past `v32.0`'s, and to no other node. The option
-sets the share of inbound slots that peers relaying transactions may
-take (`CConnman::Init`, `src/net.h`), which `v31.1` does not bound, and
-the share it defaults to admits every peer that check connects: so the
-check asserts the same on either build, with the option or without it. A
-`master` build between the option's merge and the version's move to
-`32.99` reads older and starts without it, the constant's own comment
-having the commits.
+`v32.0rc1` is the first tag to carry, and which a release before it
+refuses as unknown. Here the check sending many orphans, the one
+connecting the most inbound peers, passes it to a bitcoind whose
+`getnetworkinfo` `version` reads at or past `v32.0`'s, and to no other
+node. The option sets the share of inbound slots that peers relaying
+transactions may take (`CConnman::Init`, `src/net.h`), which a release
+before it does not bound, and the share it defaults to admits every peer
+that check connects: so the check asserts the same on either build, with
+the option or without it. A `master` build between the option's merge
+and the version's move to `32.99` reads older and starts without it, the
+constant's own comment having the commits.
 
 A build before `v30.0rc1` bounds the orphanage by count alone, at
 `DEFAULT_MAX_ORPHAN_TRANSACTIONS` (`-maxorphantx`, `src/net_processing.h`),
@@ -226,10 +226,10 @@ _INBOUND_RELAY_PERCENT = "-inboundrelaypercent=100"
 # Core's own `CLIENT_VERSION` (`src/clientversion.h`), the running build's
 # own `getnetworkinfo` `version`, at or past which bitcoind takes
 # `-inboundrelaypercent`: `v32.0`'s, `v32.0rc1` being the first tag
-# carrying it and `31.1` refusing it. A known limit: a `master`
-# build from its merge (`11ebbd9072`, 2026-07-24) until the version moved
-# to `32.99` (`f3fec67c3e`, 2026-09-11) reports `319900` and takes it all
-# the same, so it starts without it
+# carrying it and a release before it refusing it. A known limit: a
+# `master` build from its merge (`11ebbd9072`, 2026-07-24) until the
+# version moved to `32.99` (`f3fec67c3e`, 2026-09-11) reports `319900` and
+# takes it all the same, so it starts without it
 _INBOUND_RELAY_PERCENT_VERSION = 320000
 
 # Core's own `MAX_STANDARD_TX_WEIGHT` (`test_framework/blocktools.py`)

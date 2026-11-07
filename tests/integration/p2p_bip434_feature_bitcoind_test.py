@@ -11,18 +11,18 @@ build lacking BIP434 support disconnects for anyway rather than to
 `NetMsgType::FEATURE` landed in
 `6a129983c9bf8efa1081f9a8b462c3635d1cfb39` ("BIP434: FEATURE message
 support"), the same commit that bumped `node/protocol_version.h`'s own
-`PROTOCOL_VERSION` past `31.1`'s own value -- so a build
-below that version does not merely negotiate `FEATURE` differently, it
-has no branch for the `"feature"` command at all, and the
-length-boundary and acceptance checks Core's own file also carries
+`PROTOCOL_VERSION` from `70016` to `70017` -- so a build below that
+version does not merely negotiate `FEATURE` differently, it has no branch
+for the `"feature"` command at all, and the length-boundary and
+acceptance checks Core's own file also carries
 (`test_feature_id_length_boundaries`, `test_many_features_in_handshake`,
 and the rest) read the log of a node Core's file starts with
-`-peertimeout` above its default, so they need more than one of step
-5's mechanisms (issue #14) and are not this row's; this module passes
-no `-peertimeout`. What is kept is the two disconnects observable on the
+`-peertimeout` above its default, so they need more than one of step 5's
+mechanisms (issue #14) and are not this row's; this module passes no
+`-peertimeout`. What is kept is the two disconnects observable on the
 wire alone, with no log needed to confirm either: a `FEATURE` sent after
-this peer's own `verack` completes, and one sent by a peer that never
-got as far as offering the version `FEATURE` needs at all.
+this peer's own `verack` completes, and one sent by a peer that never got
+as far as offering the version `FEATURE` needs at all.
 
 Second, to a fact read from the running build rather than assumed for
 the whole class ([ISS 35](https://github.com/btclib-org/functional-tests/issues/35),
@@ -69,8 +69,8 @@ _SERVICES = ServiceFlags.NODE_NETWORK | ServiceFlags.NODE_WITNESS
 _USER_AGENT = b"/btclib-functional-tests:0/"
 
 # node/protocol_version.h, read at Core's `master`: the protocol version
-# BIP434's FEATURE message needs, and the one `31.1` never reaches
-# (module docstring above).
+# BIP434's FEATURE message needs, and one no release before `v32.0`
+# reaches (module docstring above).
 _FEATURE_VERSION = 70017
 
 

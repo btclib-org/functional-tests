@@ -22,14 +22,14 @@ and blocks mined under the wall clock give it a fork below its tip,
 the node's own chain has there, with Core's `in_memory` option and
 without.
 
-Not every build dumps at a height a fork also reaches: `31.1` refuses
-to, the fork's own block taking the tip once the node rolls back, so the
-caller says which the running node is expected to do, and the refusal is
-asserted with the build's own code and message.
+Not every build dumps at a height a fork also reaches: a release before
+`v32.0` refuses to, the fork's own block taking the tip once the node
+rolls back, so the caller says which the running node is expected to do,
+and the refusal is asserted with the build's own code and message.
 
 Core asserts the hashes as constants: the block at the tip, the file's
-own SHA256 and `txoutset_hash`. Each depends on the coinbase the
-build writes, and Core's own file carries different constants at `v31.1`
+own SHA256 and `txoutset_hash`. Each depends on the coinbase the build
+writes, and Core's own file carries different constants at `v30.3`
 than at the pin. This asserts each against what the same node reports:
 the block `getblockhash` answers at the tip's height; the file's
 metadata naming that block, the regtest network and the coins written,
@@ -137,7 +137,8 @@ def _dumps_across_a_fork(node: NodeAdapter, *, rolls_back: bool) -> None:
 
     :param node: the node, its chain `COINBASE_MATURITY` blocks tall.
     :param rolls_back: whether the build dumps at that height, as the
-        pinned file asserts, or refuses to, as `31.1` does.
+        pinned file asserts, or refuses to, as a release before `v32.0`
+        does.
     """
     tip = node.rpc.call("getbestblockhash")
     target_height = node.rpc.call("getblockcount") - _FORK_DEPTH

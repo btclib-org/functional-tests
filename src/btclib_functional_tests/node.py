@@ -77,8 +77,8 @@ _STDERR_DIR = "stderr"
 
 # the exit code `stop` accepts, for every adapter: Core's own
 # `TestNode.stop_node` expects 0, and each node exits 0 on `terminate`'s
-# SIGTERM -- measured on bitcoind 31.1, btclib-node 2026.9.24 and
-# btclib-node's `main` at f8f7143
+# SIGTERM -- measured on the bitcoind release `node-integration.yml`
+# pins, btclib-node 2026.9.24 and btclib-node's `main` at f8f7143
 _CLEAN_EXIT = 0
 
 # every option naming the chain a node runs: Core's `-chain=` and the four
@@ -365,10 +365,11 @@ def _check_extra_args(command: Sequence[str], extra_args: Sequence[str]) -> None
     """Refuse an `extra_args` entry naming an option `command` already sets.
 
     bitcoind takes the last of a repeated option with no diagnostic
-    (measured against 31.1, given `-datadir` twice), so an
-    `extra_args` entry that names one of `command`'s own options
-    replaces it silently once appended after `command` -- refused here
-    instead, before either ever reaches a process.
+    (measured against the release `node-integration.yml` pins, given
+    `-datadir` twice), so an `extra_args` entry that names one of
+    `command`'s own options replaces it silently once appended after
+    `command` -- refused here instead, before either ever reaches a
+    process.
 
     :param command: the adapter's own argv, `_command()`'s answer.
     :param extra_args: what a caller asks to append after it.
@@ -1146,21 +1147,27 @@ def connect_nodes(
     `addnode`'s own third argument, `v2transport`, is passed explicitly,
     `False` unless the caller asks otherwise, rather than left to `first`'s
     own default: bitcoind's own default is `True` from `v27.0`
-    (`DEFAULT_V2_TRANSPORT`, `src/net.h`; measured live against `31.1` -- a
-    bare `addnode ... "onetry"` against a `BtclibNodeAdapter` never
-    completes a handshake, bitcoind's own `debug.log` reading "start sending
-    v2 handshake to peer=0" immediately followed by "socket closed,
-    disconnecting peer=0"), and a `btclib-node` build without `-v2transport`
-    reads and type-checks the argument without acting on it
-    (`rpc/callbacks.py`'s own docstring). bitcoind itself never falls back
-    to v1 once a v2 attempt is reset
-    ([ISS btclib-node#1197](https://github.com/btclib-org/btclib-node/issues/1197)),
-    which is why it is stated rather than left to a fallback. Core's own
-    `connect_nodes` (`test_framework.py`) makes the identical choice through
-    its own `peer_advertises_v2` parameter, defaulting to whichever side is
-    dialling; here the default is v1, and a test whose subject is BIP324
-    between two nodes declaring `Capability.V2TRANSPORT` passes
-    `v2transport=True`.
+    (`DEFAULT_V2_TRANSPORT`, `src/net.h`), and a `btclib-node` build without
+    `-v2transport` reads and type-checks the argument without acting on it
+    (`rpc/callbacks.py`'s own docstring). A bare `addnode ... "onetry"`
+    opens with a v2 handshake, and bitcoind retries over v1 only where
+    `V2Transport::ShouldReconnectV1` (`src/net.cpp`,
+    bitcoin/bitcoin@f0de87f040) allows it. Measured against the release
+    `node-integration.yml` pins dialling btclib-node 2026.11.7 started with
+    `-nov2transport`, bitcoind's own `debug.log` reads "start sending v2
+    handshake to peer=0", "socket closed, disconnecting peer=0" and
+    "retrying with v1 transport protocol for peer=0". What stops the retry
+    is the peer sending anything before it closes, which is why the
+    argument is stated rather than left to a fallback:
+    `ShouldReconnectV1` reads only the transport's state, and
+    `DisconnectNodes` calls it however the socket closed (the closing
+    comment of
+    [ISS btclib-node#1197](https://github.com/btclib-org/btclib-node/issues/1197#issuecomment-5928114787)).
+    Core's own `connect_nodes` (`test_framework.py`) makes the identical
+    choice through its own `peer_advertises_v2` parameter, defaulting to
+    whichever side is dialling; here the default is v1, and a test whose
+    subject is BIP324 between two nodes declaring `Capability.V2TRANSPORT`
+    passes `v2transport=True`.
 
     :param first: the node asked to dial.
     :param second: the node dialled.

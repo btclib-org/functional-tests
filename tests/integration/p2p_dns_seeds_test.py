@@ -51,8 +51,9 @@ where Core's counts from its start.
 
 Core's `force_dns_test` step also passes with its `-forcednsseed`
 removed, here and under Core's own framework alike (measured against
-`31.1`): the node already knows an address, so it queries the seeds
-after its shorter wait, which ends inside the step's own.
+the release `node-integration.yml` pins): the node already knows an
+address, so it queries the seeds after its shorter wait, which ends
+inside the step's own.
 
 Each `p2p_dns_seeds_<node>_test.py` module beside this one runs it,
 `tests/integration/conftest.py`'s own module docstring having how.

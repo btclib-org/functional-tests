@@ -20,15 +20,15 @@ triggers the eviction, exactly one peer is disconnected, and it is none
 of the peers expected to be protected. What fills those slots differs
 between builds, and is read from the build (ISS 35): Core's
 `1b76e0473647` lets transaction-relaying peers take only half of a
-node's inbound slots, where `31.1` gives every inbound slot to any peer.
-`-maxconnections=53` leaves twenty-one transaction-relaying slots under
-the split, `-maxconnections=32` twenty-one slots without it, the value
-Core's own file carried before `1b76e0473647`, and
-`_splits_inbound_slots` below asks the node's own `-help` which of the
-two it is -- `-inboundrelaypercent`, whose default keeps that commit's
-half, or that commit's own wording of the split. The node starts without
-`-maxconnections` and is restarted with the value the probe picks,
-Core's own `extra_args` given at a restart.
+node's inbound slots, where a release before `v32.0` gives every inbound
+slot to any peer. `-maxconnections=53` leaves twenty-one
+transaction-relaying slots under the split, `-maxconnections=32`
+twenty-one slots without it, the value Core's own file carried before
+`1b76e0473647`, and `_splits_inbound_slots` below asks the node's own
+`-help` which of the two it is -- `-inboundrelaypercent`, whose default
+keeps that commit's half, or that commit's own wording of the split. The
+node starts without `-maxconnections` and is restarted with the value
+the probe picks, Core's own `extra_args` given at a restart.
 
 `Peer` answers a ping only while a caller is reading, where Core's
 `P2PInterface` answers from a background thread, so `_sync_with_ping`

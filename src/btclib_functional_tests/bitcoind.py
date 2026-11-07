@@ -152,10 +152,10 @@ def _has_wallet(executable: str) -> bool:
     passed yet -- and two probes racing on that file print "Settings
     file could not be written" in place of the help text, `Wallet
     options:` included, rather than refusing to start. Measured live
-    under twenty concurrent probes of the `31.1` release, with
-    `-nosettings` absent: two answered `_has_wallet` `False` for a binary
-    that has one -- `xdist`'s own several workers each constructing a
-    `BitcoindAdapter` is exactly that concurrency.
+    against the release `node-integration.yml` pins, concurrent probes
+    with `-nosettings` absent can answer `_has_wallet` `False` for a
+    binary that has one -- `xdist`'s own several workers each
+    constructing a `BitcoindAdapter` is exactly that concurrency.
 
     :param executable: the `bitcoind` binary to probe.
     """
@@ -288,10 +288,11 @@ class BitcoindAdapter(NodeAdapter):
     `Capability.DISCONNECT` is `node.disconnect_nodes`'s own
     `disconnectnode`, and `Capability.BAN` is `setban`/`listbanned`/
     `clearbanned`: all three, like `addnode`, are in this release's own
-    `help` listing with no argument, unconditional the same way
-    (measured against `31.1`, [ISS functional-tests#43](https://github.com/btclib-org/functional-tests/issues/43)).
+    `help` listing with no argument, unconditional the same way (measured
+    against the release `node-integration.yml` pins,
+    [ISS functional-tests#43](https://github.com/btclib-org/functional-tests/issues/43)).
     `Capability.RAW_MESSAGE` is `sendmsgtopeer`, a debug RPC this release
-    answers (measured against `31.1`: not in `help`'s own
+    answers (measured against the same release: not in `help`'s own
     listing, which is for discoverability rather than availability, but
     `help sendmsgtopeer` answers its own signature) and which no other
     adapter's node offers yet. `Capability.BLK_FILES` is unconditional
@@ -305,31 +306,31 @@ class BitcoindAdapter(NodeAdapter):
     whatever a later option capability turns out to name.
     `Capability.CLOCK` is `setmocktime`, wrapped by
     `NodeAdapter.set_mock_time` (`node.py`) -- a regtest-only RPC in the
-    same standing as `sendmsgtopeer` above (measured against `31.1`:
-    also absent from `help`'s own listing, and also answering
+    same standing as `sendmsgtopeer` above (measured against the same
+    release: also absent from `help`'s own listing, and also answering
     `help setmocktime` directly). `Capability.RPC_AUTH_CONFIG` is
     unconditional too: `rpcauth`, `rpcwhitelist` and
     `rpcwhitelistdefault` are this binary's own `bitcoin.conf` keys,
     read the same way regardless of which adapter wrote the file.
     `Capability.RPC_AUTH_NEGATION` is unconditional too: `-norpcauth`
     disabling every `-rpcauth` given before it is `ArgsManager`'s own
-    generic negation of a list-type setting, not a fact `-rpcauth`
-    itself carries -- measured live against `31.1`, a request
-    authenticated with a credential named on the command line before
-    `-norpcauth` gets 401 once the node has started.
+    generic negation of a list-type setting, not a fact `-rpcauth` itself
+    carries -- measured live against the release `node-integration.yml`
+    pins, a request authenticated with a credential named on the command
+    line before `-norpcauth` gets 401 once the node has started.
     `Capability.TEST_ACTIVATION_HEIGHT` is unconditional too:
     `-testactivationheight` is a debug-only flag of this binary's own,
     read by `ArgsManager` before any deployment is checked, so nothing
     about which deployment or which height is named changes whether the
     flag itself is recognised.
-    `Capability.V2TRANSPORT` is unconditional too: `-v2transport` is
-    this binary's own flag, defaulting to `1` on `31.1`
-    (measured against `-help`'s own listing) -- node-to-node connections
-    already report `transport_protocol_type: v2` in `getpeerinfo` with
-    no argument at all, and `-v2transport=0` on either side falls back to
-    `v1`. A `Peer` (`peer.py`) reaches this node over v1 unless it is
-    asked for v2, BIP324's own detection accepting a v1 handshake from
-    either side.
+    `Capability.V2TRANSPORT` is unconditional too: `-v2transport` is this
+    binary's own flag, defaulting to `1` (measured against `-help`'s own
+    listing of the release `node-integration.yml` pins) -- node-to-node
+    connections already report `transport_protocol_type: v2` in
+    `getpeerinfo` with no argument at all, and `-v2transport=0` on either
+    side falls back to `v1`. A `Peer` (`peer.py`) reaches this node over v1
+    unless it is asked for v2, BIP324's own detection accepting a v1
+    handshake from either side.
     `Capability.DATACARRIER`, `Capability.PERMIT_BARE_MULTISIG`,
     `Capability.DUST_RELAY_FEE`, `Capability.BYTES_PER_SIGOP` and
     `Capability.MAXMEMPOOL` are unconditional too: `-datacarrier`,
@@ -351,9 +352,9 @@ class BitcoindAdapter(NodeAdapter):
     is this binary's own RPC (`src/rpc/output_script.cpp`), with no
     wallet behind it.
     `Capability.TYPED_OUTBOUND` is `addconnection`, wrapped by
-    `NodeAdapter.add_outbound_connection` (`node.py`): a regtest-only RPC
-    in the same standing as `setmocktime` above (measured against
-    `31.1`: absent from `help`'s own listing, answering
+    `NodeAdapter.add_outbound_connection` (`node.py`): a regtest-only RPC in
+    the same standing as `setmocktime` above (measured against the release
+    `node-integration.yml` pins: absent from `help`'s own listing, answering
     `help addconnection` directly).
     `Capability.RPC_WORK_QUEUE` is unconditional too: `-rpcthreads` and
     `-rpcworkqueue` are this binary's own flags, and the refusal of a
@@ -684,14 +685,14 @@ class BitcoindAdapter(NodeAdapter):
         is asked for.
 
         `-unsafesqlitesync` is Core's own `write_config` (`util.py`) line,
-        written there "so that the tests don't timeout": it turns a
-        wallet's SQLite `synchronous` pragma off (`src/wallet/sqlite.cpp`),
-        so a block a loaded wallet connects waits on no flush to disk.
-        Without it, one `generatetoaddress` over a loaded wallet spent most
-        of its time in those flushes and outlasted the RPC client's own
-        timeout on a loaded machine (measured against `31.1`,
-        [ISS 226](https://github.com/btclib-org/functional-tests/issues/226)).
-        A build without wallet support starts on it too:
+        written there "so that the tests don't timeout": it turns a wallet's
+        SQLite `synchronous` pragma off (`src/wallet/sqlite.cpp`), so a
+        block a loaded wallet connects waits on no flush to disk. Without
+        it, one `generatetoaddress` over a loaded wallet waits on those
+        flushes, and mines blocks much more slowly.
+        [ISS 226](https://github.com/btclib-org/functional-tests/issues/226)
+        has such a call outlasting the RPC client's own timeout on a loaded
+        machine. A build without wallet support starts on it too:
         `DummyWalletInit::AddWalletOptions` (`src/dummywallet.cpp`) hides it
         rather than leaving it unknown.
 
@@ -699,24 +700,28 @@ class BitcoindAdapter(NodeAdapter):
         line too, written there to "disable server-side timeouts to avoid
         intermittent issues". bitcoind closes an RPC connection idle for
         `-rpcservertimeout` seconds, 30 by default
-        (`DEFAULT_HTTP_SERVER_TIMEOUT`, `src/httpserver.h`), while
-        `NodeAdapter` keeps its connections open across calls
-        (`_ThreadSessions`, `node.py`). `SessionTransport` probes a kept
-        connection before reusing it and does not retry a bare
-        `ConnectionResetError` its read raises, so a close landing between
-        that probe and the request can reach the caller as a `FetchError`
-        raised from one (measured against `31.1`,
-        [ISS 336](https://github.com/btclib-org/functional-tests/issues/336)).
+        (`DEFAULT_HTTP_SERVER_TIMEOUT`, `src/httpserver.h`,
+        bitcoin/bitcoin@f0de87f040; measured against the release
+        `node-integration.yml` pins, a kept connection still open after 25
+        seconds idle and closed by 35), while `NodeAdapter` keeps its
+        connections open across calls (`_ThreadSessions`, `node.py`).
+        `SessionTransport` probes a kept connection before reusing it and
+        does not retry a bare `ConnectionResetError` its read raises, so a
+        close landing between that probe and the request can reach the
+        caller as a `FetchError` raised from one
+        ([ISS 336](https://github.com/btclib-org/functional-tests/issues/336)).
 
         `-rpcallowip=127.0.0.1` is what makes `-rpcbind` bind at all:
-        Core's `HTTPBindAddresses` (`src/httpserver.cpp`) ignores
-        `-rpcbind` unless `-rpcallowip` is also given, binds `::1` and
-        `127.0.0.1` instead, and starts where either one binds. With both
-        given, `127.0.0.1` is the one RPC endpoint, so a port another
-        process already holds there fails init and the process exits,
-        which `_wait_for_rpc` (`node.py`) reports on its exit code rather
-        than waiting out its timeout against a node answering on `::1`
-        alone (measured against `31.1`,
+        Core's `GetBindAddresses` (`src/httpserver.cpp`,
+        bitcoin/bitcoin@f0de87f040) ignores `-rpcbind` unless
+        `-rpcallowip` is also given and binds `::1` and `127.0.0.1`
+        instead, and `InitHTTPServer` starts where either one binds. With
+        both given, `127.0.0.1` is the one RPC endpoint, so a port
+        another process already holds there fails init and the process
+        exits, which `_wait_for_rpc` (`node.py`) reports on its exit code
+        rather than waiting out its timeout against a node answering on
+        `::1` alone (measured against the release `node-integration.yml`
+        pins,
         [ISS 135](https://github.com/btclib-org/functional-tests/issues/135)).
         It admits no client the default does not: `InitHTTPAllowList`
         admits `127.0.0.0/8` and `::1` whatever `-rpcallowip` names.
@@ -856,7 +861,8 @@ class BitcoindAdapter(NodeAdapter):
         restart leaves the wallet on disk and unloaded, and a second adapter
         over the same datadir finds the first one's there, where
         `createwallet` answers "Database already exists" (measured against
-        `31.1`, [ISS 86](https://github.com/btclib-org/functional-tests/issues/86)).
+        the release `node-integration.yml` pins,
+        [ISS 86](https://github.com/btclib-org/functional-tests/issues/86)).
         `listwalletdir` is what names a wallet on disk and unloaded.
         """
         loaded = self.rpc.call("listwallets")

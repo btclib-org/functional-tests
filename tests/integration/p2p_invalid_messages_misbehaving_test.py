@@ -8,20 +8,20 @@ Read from Core's `test/functional/p2p_invalid_messages.py`
 (`3fd68a95e68b`, 2026-04-07)'s own `test_oversized_inv_msg`,
 `test_oversized_getdata_msg`, `test_oversized_headers_msg` (each through
 the shared `test_oversized_msg`), `test_invalid_pow_headers_msg` and
-`test_noncontinuous_headers_msg`, none
-ported by `p2p_invalid_messages_test.py`: that module's own docstring
-narrows to `test_magic_bytes` and `test_size`, and Core's own
+`test_noncontinuous_headers_msg`, none ported by
+`p2p_invalid_messages_test.py`: that module's own docstring narrows to
+`test_magic_bytes` and `test_size`, and Core's own
 `InvalidMessagesTest.run_test` runs every one of these on the same node,
 started once with `self.extra_args = [["-whitelist=addr@127.0.0.1"]]`.
-That permission (`net_permissions.cpp`, `v31.1`'s `TryParsePermissionFlags`:
-the string before `@` is parsed as a permission list, and `addr` is one)
-grants `NetPermissionFlags::Addr` alone, not `NoBan` -- so it does not
-exempt this connection from the discourage-and-disconnect
-`net_processing.cpp`'s own `Misbehaving` schedules
-(`PeerManagerImpl::MaybeDiscourageAndDisconnect`, `if
+That permission (`src/net_permissions.cpp`'s `TryParsePermissionFlags`,
+bitcoin/bitcoin@f0de87f040: the string before `@` is parsed as a
+permission list, and `addr` is one) grants `NetPermissionFlags::Addr`
+alone, not `NoBan` -- so it does not exempt this connection from the
+discourage-and-disconnect `net_processing.cpp`'s own `Misbehaving`
+schedules (`PeerManagerImpl::MaybeDiscourageAndDisconnect`, `if
 (pnode.HasPermission(NetPermissionFlags::NoBan)) { ... never disconnect
-... }`), which is what the checks below are about; dropping it is
-the same narrowing `test_magic_bytes` already made.
+... }`), which is what the checks below are about; dropping it is the
+same narrowing `test_magic_bytes` already made.
 
 Each of Core's own checks calls `assert_debug_log(['Misbehaving', ...])`
 around an oversized, PoW-invalid or non-continuous message and then waits for a

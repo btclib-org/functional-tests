@@ -36,8 +36,9 @@ other. Under segwit's rules `CheckWitnessMalleation` refuses that pair
 (`bad-witness-nonce-size`), which is what stops the reindexed chain one
 block short of the lower height. A `MiniWallet` block carries neither,
 and a block committing to no witness and carrying none is valid either
-side of activation: measured against bitcoind `31.1`, a chain
-of them reindexes to its full mined height instead.
+side of activation: measured against the bitcoind release
+`node-integration.yml` pins, a chain of them reindexes to its full mined
+height instead.
 
 `NodeAdapter.start` (`node.py`) waits for the RPC to answer and no
 longer, where Core's own `TestNode.wait_for_rpc_connection` also waits

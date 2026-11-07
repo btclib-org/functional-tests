@@ -28,12 +28,13 @@ fresh node:
 
 The header ahead of the `cmpctblock`, and the peer's own `sendcmpct`
 ahead of both, are steps of Core's file from `v32.0` and not of
-`31.1`'s. From `v32.0` a node ignores a `cmpctblock` it did not ask for
+`v30.3`'s. From `v32.0` a node ignores a `cmpctblock` it did not ask for
 from a peer it has not chosen for high-bandwidth relay
 (bitcoin/bitcoin@831359171582fc8220f9082049fddc0cc185f93d), and one from
 a peer that never sent `sendcmpct`
-(bitcoin/bitcoin@9c5dd2926aa97ba3d602185d5409e99f230acac4). `31.1`
-passes with both steps.
+(bitcoin/bitcoin@9c5dd2926aa97ba3d602185d5409e99f230acac4). A release
+before `v32.0` passes with both steps, as `node-integration.yml`'s
+`older-core` job measures.
 
 The block spends a `MiniWallet` coin of the node under test, mined over
 `Capability.MINE`, and is built and solved here rather than read from

@@ -15,42 +15,40 @@ needs an adapter change, `NodeAdapter.__init__`'s own
 an option either adapter's `_command()` sets itself.
 
 A smaller claim than Core's own file, declared rather than silent.
-Dropped: the `rpcauth.py` script Core's own harness runs as a
-subprocess to generate two of its four credentials, and the
-`SystemRandom`-chosen username -- both a claim about that script rather
-than about `Capability.RPC_AUTH_CONFIG`, which `_rpcauth_line` below
-generates a credential for the same way `rpc_whitelist_test.py`
-already does. `-rpcuser`/`-rpcpassword` and `-norpccookiefile` each
-write no RPC cookie, measured live against `31.1` --
+Dropped: the `rpcauth.py` script Core's own harness runs as a subprocess
+to generate two of its four credentials, and the `SystemRandom`-chosen
+username -- both a claim about that script rather than about
+`Capability.RPC_AUTH_CONFIG`, which `_rpcauth_line` below generates a
+credential for the same way `rpc_whitelist_test.py` already does.
+`-rpcuser`/`-rpcpassword` and `-norpccookiefile` each write no RPC
+cookie, measured live against the release `node-integration.yml` pins --
 `rpcauth` given alongside either does not bring the cookie back -- so a
-client that waits on the cookie the adapter's `_rpc_client()`
-otherwise reads never sees one and `start` timed out rather than the
-node ever answering RPC
+client that waits on the cookie the adapter's `_rpc_client()` otherwise
+reads never sees one and `start` timed out rather than the node ever
+answering RPC
 ([ISS functional-tests#34](https://github.com/btclib-org/functional-tests/issues/34)).
-`rpc_auth`
-(`NodeAdapter.__init__`, `node.py`) is what lets them back in: the
-caller that puts either flag in `extra_args` already knows the
-plaintext credential it chose there, exactly as Core's own harness
-knows the plaintext of whatever it wrote into `bitcoin.conf`, and
-passes it to the adapter instead of leaving the readiness wait on a
-cookie the node never writes. Core's own equivalent test hits the
-identical gap for `-norpccookiefile` alone and works around it with
+`rpc_auth` (`NodeAdapter.__init__`, `node.py`) is what lets them back
+in: the caller that puts either flag in `extra_args` already knows the
+plaintext credential it chose there, exactly as Core's own harness knows
+the plaintext of whatever it wrote into `bitcoin.conf`, and passes it to
+the adapter instead of leaving the readiness wait on a cookie the node
+never writes. Core's own equivalent test hits the identical gap for
+`-norpccookiefile` alone and works around it with
 `busy_wait_for_debug_log`, an alternate readiness wait keyed on the
 debug log rather than RPC -- unneeded here, since `-norpccookiefile`
 below is paired with an `-rpcauth` value whose plaintext this file
 already holds, unlike Core's own `test_norpccookiefile`, which pairs it
-with a `-rpcauth` value `get_auth_cookie`
-(`test_framework/util.py`) has no way to recover the plaintext of from
-`bitcoin.conf` alone. Of Core's own `test_auth` combinations, the
-`-rpcuser`/`-rpcpassword` test checks the right credential and a wrong
-password only: the wrong user and the wrong pair go through the same
-comparison (`CheckUserAuthorized`, `httprpc.cpp`) that
-`rpcauth_via_config_authenticates_and_refuses` already drives
-through all four. Dropped last: `platform.system() == 'Windows'`
-is never this repository's own gate (`CONTRIBUTING.md`'s own table: one
-image, `ubuntu-latest`), so the branch `test_rpccookieperms` takes on
-it is unreachable here and the POSIX permission check below is the
-whole of that test.
+with a `-rpcauth` value `get_auth_cookie` (`test_framework/util.py`) has
+no way to recover the plaintext of from `bitcoin.conf` alone. Of Core's
+own `test_auth` combinations, the `-rpcuser`/`-rpcpassword` test checks
+the right credential and a wrong password only: the wrong user and the
+wrong pair go through the same comparison (`CheckUserAuthorized`,
+`httprpc.cpp`) that `rpcauth_via_config_authenticates_and_refuses`
+already drives through all four. Dropped last: `platform.system() ==
+'Windows'` is never this repository's own gate (`CONTRIBUTING.md`'s own
+table: one image, `ubuntu-latest`), so the branch `test_rpccookieperms`
+takes on it is unreachable here and the POSIX permission check below is
+the whole of that test.
 
 Ported, against its own capability rather than `RPC_AUTH_CONFIG`:
 Core's own "-norpcauth disables previous -rpcauth params" check,
