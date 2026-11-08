@@ -8,18 +8,6 @@ it can sit beside, or replace, Core's own `test/functional/test_framework/`
 (issue btclib-org/btclib#2220). tf2 is this project's nickname and its
 label.
 
-<!-- The badges are what the reader decides with, in three groups: what the
-software is and whether it can be used, whether it works, and what the
-OpenSSF makes of it. This tree publishes nothing, so the first group and
-the licence badge, both tier 1's, are absent.
--->
-[![pre-commit.ci status](https://results.pre-commit.ci/badge/github/btclib-org/functional-tests/main.svg)](https://results.pre-commit.ci/latest/github/btclib-org/functional-tests/main)
-[![lint workflow status](https://github.com/btclib-org/functional-tests/actions/workflows/lint.yml/badge.svg?branch=main)](https://github.com/btclib-org/functional-tests/actions/workflows/lint.yml?query=branch%3Amain)
-[![test workflow status](https://github.com/btclib-org/functional-tests/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/btclib-org/functional-tests/actions/workflows/test.yml?query=branch%3Amain)
-[![docs workflow status](https://github.com/btclib-org/functional-tests/actions/workflows/docs.yml/badge.svg?branch=main)](https://github.com/btclib-org/functional-tests/actions/workflows/docs.yml?query=branch%3Amain)
-[![vendored-vectors workflow status](https://github.com/btclib-org/functional-tests/actions/workflows/vendored-vectors.yml/badge.svg?branch=main)](https://github.com/btclib-org/functional-tests/actions/workflows/vendored-vectors.yml?query=branch%3Amain)
-[![links workflow status](https://github.com/btclib-org/functional-tests/actions/workflows/links.yml/badge.svg?branch=main)](https://github.com/btclib-org/functional-tests/actions/workflows/links.yml?query=branch%3Amain)
-
 The ambition is a suite for every full node speaking that protocol:
 today [Bitcoin Core](https://github.com/bitcoin/bitcoin),
 [btclib-node](https://github.com/btclib-org/btclib-node) and
@@ -97,7 +85,12 @@ what it intends to do, and what it deliberately does not, is its
 - Source: <https://github.com/btclib-org/functional-tests>
 - [CHANGELOG.md](./CHANGELOG.md)
 
-<!-- No "actively supported by" line: section 2 of the organization
-standard gives it to a tier-1 tree, an index rendering the README with
-no organization beside it -- this tree publishes nothing, and
-below tier 1 `profile/README.md` says it once for all. -->
+## Status
+
+<!-- Section 2 of btclib-org/.github's README.md says which badges sit here. -->
+[![pre-commit.ci status](https://results.pre-commit.ci/badge/github/btclib-org/functional-tests/main.svg)](https://results.pre-commit.ci/latest/github/btclib-org/functional-tests/main)
+[![lint workflow status](https://github.com/btclib-org/functional-tests/actions/workflows/lint.yml/badge.svg?branch=main)](https://github.com/btclib-org/functional-tests/actions/workflows/lint.yml?query=branch%3Amain)
+[![test workflow status](https://github.com/btclib-org/functional-tests/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/btclib-org/functional-tests/actions/workflows/test.yml?query=branch%3Amain)
+[![docs workflow status](https://github.com/btclib-org/functional-tests/actions/workflows/docs.yml/badge.svg?branch=main)](https://github.com/btclib-org/functional-tests/actions/workflows/docs.yml?query=branch%3Amain)
+[![vendored-vectors workflow status](https://github.com/btclib-org/functional-tests/actions/workflows/vendored-vectors.yml/badge.svg?branch=main)](https://github.com/btclib-org/functional-tests/actions/workflows/vendored-vectors.yml?query=branch%3Amain)
+[![links workflow status](https://github.com/btclib-org/functional-tests/actions/workflows/links.yml/badge.svg?branch=main)](https://github.com/btclib-org/functional-tests/actions/workflows/links.yml?query=branch%3Amain)
