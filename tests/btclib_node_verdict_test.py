@@ -105,6 +105,7 @@ def _results(cases: list[tuple[str, str, str]]) -> dict[str, str]:
         ("skip", "skip"),
         ("skip (blk)", "skip"),
         (f"fail ({_ISS})", "fail"),
+        (f"flaky ({_ISS})", "flaky"),
         ("not ported", "fail"),
     ],
 )
@@ -153,7 +154,15 @@ def test_expected_reads_a_failing_verdict_on_the_build(verdict: ModuleType) -> N
 
 @pytest.mark.parametrize(
     "cell",
-    ["passes", "fail", "fail (btclib-node#9)", "skip ()", "skip (two words)", ""],
+    [
+        "passes",
+        "fail",
+        "fail (btclib-node#9)",
+        "flaky",
+        "skip ()",
+        "skip (two words)",
+        "",
+    ],
 )
 def test_expected_refuses_an_unrecognised_verdict(
     verdict: ModuleType, cell: str
@@ -356,6 +365,33 @@ def test_moves_names_each_kind_of_move(
     lines = verdict.moves(_ROWS_LEDGER, _results(cases + agreeing), "release")
     assert len(lines) == 1
     assert lines[0].startswith(f"- **{kind}**: ")
+
+
+@pytest.mark.parametrize("outcome", ["pass", "fail"])
+def test_moves_reads_a_flaky_row_as_agreeing_with_a_pass_or_a_fail(
+    verdict: ModuleType, monkeypatch: pytest.MonkeyPatch, outcome: str
+) -> None:
+    """A **flaky** row's race goes either way, and neither way is a move."""
+    _patch_rows(verdict, monkeypatch)
+    text = _ledger([("`a.py`", f"flaky ({_ISS})")])
+    results = _results([("a", "test_a", outcome)])
+    for build in verdict.BUILDS:
+        assert verdict.moves(text, results, build) == []
+
+
+def test_moves_names_a_flaky_row_that_skipped(
+    verdict: ModuleType, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A skip is no outcome of the race, so it is a move."""
+    _patch_rows(verdict, monkeypatch)
+    text = _ledger([("`a.py`", f"flaky ({_ISS})")])
+    results = _results([("a", "test_a", "skip")])
+    assert verdict.moves(text, results, "release") == [
+        (
+            f"- **skipped**: `a.py` -- TF2.md reads flaky ({_ISS}); this run's"
+            " outcome is skip: `test_a`"
+        )
+    ]
 
 
 def test_moves_names_only_the_testcases_that_decided_the_outcome(

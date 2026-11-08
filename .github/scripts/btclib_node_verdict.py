@@ -29,12 +29,13 @@ second issue (`and before [ISS ...]`) is refused as any other shape the
 ledger does not define.
 
 A verdict is `pass`, `skip` with or without a parenthetical,
-`fail ([ISS ...](...))` or `not ported`; `bitcoind only` is a whole cell
-naming no btclib-node test at all. A cell or a segment in any other
-shape raises `LedgerError` rather than being read as some verdict: a
-cell this cannot read is a row nothing compares. The parenthetical of a
-skip is the ledger's own shorthand (`blk` for `Capability.BLK_FILES`),
-not a `Capability` value, so which capability refused is not compared.
+`fail ([ISS ...](...))`, `flaky ([ISS ...](...))` or `not ported`;
+`bitcoind only` is a whole cell naming no btclib-node test at all. A
+cell or a segment in any other shape raises `LedgerError` rather than
+being read as some verdict: a cell this cannot read is a row nothing
+compares. The parenthetical of a skip is the ledger's own shorthand
+(`blk` for `Capability.BLK_FILES`), not a `Capability` value, so which
+capability refused is not compared.
 
 **What a row's outcome is.** A row's testcases are read together: the
 row failed where any of them failed, skipped where none failed and any
@@ -42,7 +43,8 @@ skipped, and passed where every one passed. A **skip** row can hold a
 passing test beside the skipping one -- `feature_blocksdir.py`'s own
 refusal passes on btclib-node's `main` -- and a **fail** row needs one failing
 test, not every one. A **fail** and a **not ported** row both expect
-the row to fail.
+the row to fail. A **flaky** row expects it to pass or to fail, and
+neither is a move; a skip there is one.
 
 **Which testcase is which row's.** A JUnit testcase names a module and a
 function, a ledger row a Core file and a qualifier, and nothing in either
@@ -90,6 +92,7 @@ _VERDICTS = (
     (re.compile(r"pass"), "pass"),
     (re.compile(r"not ported"), "fail"),
     (re.compile(rf"fail \({_ISS}\)"), "fail"),
+    (re.compile(rf"flaky \({_ISS}\)"), "flaky"),
     (re.compile(r"skip(?: \(\w+\))?"), "skip"),
 )
 
@@ -921,7 +924,8 @@ class Expected:
 
     :param text: the cell's own verdict for that build, as the ledger
         spells it.
-    :param outcome: `"pass"`, `"fail"` or `"skip"`.
+    :param outcome: `"pass"`, `"fail"`, `"skip"`, or `"flaky"`, which
+        a row's pass and its fail both agree with.
     """
 
     text: str
@@ -1090,6 +1094,15 @@ _KIND = {
     ("fail", "skip"): "skipped",
     ("skip", "pass"): "ran",
     ("skip", "fail"): "ran, and failed",
+    ("flaky", "skip"): "skipped",
+}
+
+# the row outcomes that agree with each expected one
+_AGREES = {
+    "pass": {"pass"},
+    "fail": {"fail"},
+    "skip": {"skip"},
+    "flaky": {"pass", "fail"},
 }
 
 
@@ -1099,9 +1112,9 @@ def moves(ledger_text: str, results: dict[str, str], build: str) -> list[str]:
     :param ledger_text: `TF2.md`'s own text.
     :param results: `parse_junit`'s reading of the report.
     :param build: `"release"` or `"main"`, the build the report ran.
-    :returns: the lines, one per ledger row whose outcome differs from
-        its cell's verdict for that build, per row no testcase of the
-        report reached, and per testcase `_ROWS` has no row for.
+    :returns: the lines, one per ledger row whose outcome does not
+        agree with its cell's verdict for that build, per row no testcase
+        of the report reached, and per testcase `_ROWS` has no row for.
     :raises LedgerError: where a cell is in no shape the ledger defines.
     """
     by_row: dict[str, dict[str, str]] = {}
@@ -1126,7 +1139,7 @@ def moves(ledger_text: str, results: dict[str, str], build: str) -> list[str]:
             lines.append(f"- **missing**: {row} -- no testcase of this report is its")
             continue
         outcome = _outcome(list(cases.values()))
-        if outcome == verdict.outcome:
+        if outcome in _AGREES[verdict.outcome]:
             continue
         names = ", ".join(
             f"`{name}`" for name, status in cases.items() if status == outcome
