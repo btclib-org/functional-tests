@@ -87,7 +87,7 @@ what it intends to do, and what it deliberately does not, is its
 
 ## Status
 
-<!-- Section 2 of btclib-org/.github's README.md says which badges sit here. -->
+<!-- Section 2 of the organization's standard says which badges sit here. -->
 [![pre-commit.ci status](https://results.pre-commit.ci/badge/github/btclib-org/functional-tests/main.svg)](https://results.pre-commit.ci/latest/github/btclib-org/functional-tests/main)
 [![lint workflow status](https://github.com/btclib-org/functional-tests/actions/workflows/lint.yml/badge.svg?branch=main)](https://github.com/btclib-org/functional-tests/actions/workflows/lint.yml?query=branch%3Amain)
 [![test workflow status](https://github.com/btclib-org/functional-tests/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/btclib-org/functional-tests/actions/workflows/test.yml?query=branch%3Amain)
