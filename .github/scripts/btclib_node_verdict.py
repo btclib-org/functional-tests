@@ -1163,9 +1163,8 @@ def flaky_passes(ledger_text: str, results: dict[str, str], build: str) -> list[
         cases = by_row.get(row)
         if cases and _outcome(list(cases.values())) == "pass":
             lines.append(
-                f"- **flaky passed**: {row} -- TF2.md reads {verdict.text}; a"
-                " candidate for pass once that issue is closed and this build"
-                " carries its fix"
+                f"- **flaky passed**: {row} -- TF2.md reads {verdict.text}; its"
+                " legend says when this moves to pass"
             )
     return lines
 

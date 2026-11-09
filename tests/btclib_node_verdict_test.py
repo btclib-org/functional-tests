@@ -395,8 +395,8 @@ def test_moves_names_a_flaky_row_that_skipped(
 
 
 _FLAKY_PASSED = (
-    f"- **flaky passed**: `a.py` -- TF2.md reads flaky ({_ISS}); a candidate"
-    " for pass once that issue is closed and this build carries its fix"
+    f"- **flaky passed**: `a.py` -- TF2.md reads flaky ({_ISS}); its legend"
+    " says when this moves to pass"
 )
 
 
