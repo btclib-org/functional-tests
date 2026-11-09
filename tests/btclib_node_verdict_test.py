@@ -394,6 +394,53 @@ def test_moves_names_a_flaky_row_that_skipped(
     ]
 
 
+_FLAKY_PASSED = (
+    f"- **flaky passed**: `a.py` -- TF2.md reads flaky ({_ISS}); a candidate"
+    " for pass once that issue is closed and this build carries its fix"
+)
+
+
+def test_flaky_passes_lists_only_a_flaky_row_this_run_passed(
+    verdict: ModuleType, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A flaky row that failed, skipped or ran nothing is not listed."""
+    _patch_rows(verdict, monkeypatch)
+    flaky = f"flaky ({_ISS})"
+    text = _ledger(
+        [
+            ("`a.py`", flaky),
+            ("`b.py`", flaky),
+            ("`c.py`", flaky),
+            ("`d.py`", flaky),
+            ("`e.py`", "pass"),
+            ("`f.py`", "bitcoind only"),
+        ]
+    )
+    results = _results(
+        [
+            ("a", "test_a", "pass"),
+            ("b", "test_b1", "pass"),
+            ("b", "test_b2", "fail"),
+            ("c", "test_c", "skip"),
+        ]
+    )
+    for build in verdict.BUILDS:
+        assert verdict.flaky_passes(text, results, build) == [_FLAKY_PASSED]
+
+
+def test_flaky_passes_reads_each_build_against_its_own_verdict(
+    verdict: ModuleType, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A build past the issue reads pass, so its pass is no flaky row's."""
+    _patch_rows(verdict, monkeypatch)
+    text = _ledger(
+        [("`a.py`", f"flaky ({_ISS}) on the build; pass on a build past {_ISS}")]
+    )
+    results = _results([("a", "test_a", "pass")])
+    assert verdict.flaky_passes(text, results, "release") == [_FLAKY_PASSED]
+    assert verdict.flaky_passes(text, results, "main") == []
+
+
 def test_moves_names_only_the_testcases_that_decided_the_outcome(
     verdict: ModuleType, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -472,11 +519,12 @@ def _run(
     cases: list[tuple[str, str, str]],
     build: str,
     timed_out: frozenset[str] = frozenset(),
+    ledger_text: str = _ROWS_LEDGER,
 ) -> int:
-    """Write `_ROWS_LEDGER` and a report of `cases`, and run `main` on them."""
+    """Write the ledger and a report of `cases`, and run `main` on them."""
     _patch_rows(verdict, monkeypatch)
     ledger = tmp_path / "TF2.md"
-    ledger.write_text(_ROWS_LEDGER, encoding="utf-8")
+    ledger.write_text(ledger_text, encoding="utf-8")
     report = tmp_path / "integration.xml"
     report.write_text(_junit(cases, timed_out), encoding="utf-8")
     monkeypatch.setattr(sys, "argv", ["prog", str(ledger), str(report), build])
@@ -560,6 +608,24 @@ def test_main_says_nothing_moved(
     assert out == (
         "### TF2.md's btclib-node column against the main build\n\n"
         "Nothing moved: every row agrees with TF2.md.\n"
+    )
+
+
+def test_main_lists_a_flaky_row_that_passed_apart_and_exits_0(
+    verdict: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A flaky row that passed is no move: a heading of its own, exit 0."""
+    text = _ledger([("`a.py`", f"flaky ({_ISS})")])
+    cases = [("a", "test_a", "pass")]
+    assert _run(verdict, monkeypatch, tmp_path, cases, "release", ledger_text=text) == 0
+    assert capsys.readouterr().out == (
+        "### TF2.md's btclib-node column against the release build\n\n"
+        "Nothing moved: every row agrees with TF2.md.\n\n"
+        "### Flaky rows this run passed, not moves\n\n"
+        f"{_FLAKY_PASSED}\n"
     )
 
 

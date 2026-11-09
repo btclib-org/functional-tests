@@ -749,17 +749,23 @@ above pins a framework file, and each given one verdict per node this
 repository's adapter reaches.
 
 A verdict is **pass**; **fail**, naming the issue a disagreement is
-filed as on `btclib-node`'s own tracker (rule 3); **flaky**, naming the
-issue its race is filed as, where one build passes the test on some runs
-and fails it on others, so that either outcome agrees with it; or
-**skip**, naming the capability
-([`capability.py`](./src/btclib_functional_tests/capability.py)) the
-node does not declare; or **not ported**, where the node declares every
-capability the row asks for and the test run against it is still a stub
-ending in `pytest.fail`
-([ISS 82](https://github.com/btclib-org/functional-tests/issues/82)).
-bitcoind is the oracle (rule 3): a **fail** on bitcoind is this
-repository's own defect rather than a finding for another tracker.
+filed as on `btclib-node`'s own tracker (rule 3); or **skip**, naming
+the capability ([`capability.py`](./src/btclib_functional_tests/capability.py))
+the node does not declare; or **not ported**, where the node declares
+every capability the row asks for and the test run against it is still
+a stub ending in `pytest.fail`
+([ISS 82](https://github.com/btclib-org/functional-tests/issues/82));
+or **flaky**, naming the issue its race is filed as, where one build
+passes the test on some runs and fails it on others, so that either
+outcome agrees with it. A **fail** or a **pass** there is false on part
+of the runs: `btclib_node_verdict.py`'s compare then turns red on pull
+requests that change neither the test nor the node, and teaches
+rerunning it until it is green. Once that issue is closed, the pull
+request that reads a run passing the test on a build carrying its fix
+moves that build's verdict to **pass**; the compare lists each flaky row
+a run passed, apart from what moved. bitcoind is the oracle (rule 3): a
+**fail** on bitcoind is this repository's own defect rather than a
+finding for another tracker.
 
 A `btclib-node` **fail** names an issue of this repository instead where
 the test is the defect, not the node: a test that misreads a fact

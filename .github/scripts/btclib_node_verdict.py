@@ -64,6 +64,12 @@ test whose call already ended. That error does not decide the row: the
 call's own outcome does, and each such test is listed under a heading of
 its own, which does not change the exit status.
 
+**A flaky row that passed is listed apart.** It agrees with its cell, so
+it is no move. `TF2.md`'s legend says when such a verdict moves to
+**pass**, which turns on the issue the cell names, and this reads no
+issue. Each flaky row this run passed is listed under a heading of its
+own, which does not change the exit status.
+
 It exits 1 wherever anything moved, a row that now passes included:
 each move is a cell of `TF2.md` no longer describing that build, and a
 green step then means the whole column does. This writes to stdout
@@ -1117,19 +1123,7 @@ def moves(ledger_text: str, results: dict[str, str], build: str) -> list[str]:
         of the report reached, and per testcase `_ROWS` has no row for.
     :raises LedgerError: where a cell is in no shape the ledger defines.
     """
-    by_row: dict[str, dict[str, str]] = {}
-    lines: list[str] = []
-    for key, status in sorted(results.items()):
-        stem, function = locate(key)
-        row = row_of(stem, function)
-        if row is not None:
-            by_row.setdefault(row, {})[key.split("::", 1)[1]] = status
-        elif stem not in _NO_ROW:
-            lines.append(
-                f"- **no row**: `{key}` is a testcase `_ROWS` names no row for"
-            )
-        elif status == "fail":
-            lines.append(f"- **no row**: `{key}` fails, and no ledger row covers it")
+    by_row, lines = _by_row(results)
     for row, cell in ledger_cells(ledger_text).items():
         verdict = expected(row, cell, build)
         if verdict is None:
@@ -1151,6 +1145,54 @@ def moves(ledger_text: str, results: dict[str, str], build: str) -> list[str]:
     return lines
 
 
+def flaky_passes(ledger_text: str, results: dict[str, str], build: str) -> list[str]:
+    """Return one report line per **flaky** row this run passed.
+
+    :param ledger_text: `TF2.md`'s own text.
+    :param results: `parse_junit`'s reading of the report.
+    :param build: `"release"` or `"main"`, the build the report ran.
+    :returns: the lines, none of them a move.
+    :raises LedgerError: where a cell is in no shape the ledger defines.
+    """
+    by_row = _by_row(results)[0]
+    lines: list[str] = []
+    for row, cell in ledger_cells(ledger_text).items():
+        verdict = expected(row, cell, build)
+        if verdict is None or verdict.outcome != "flaky":
+            continue
+        cases = by_row.get(row)
+        if cases and _outcome(list(cases.values())) == "pass":
+            lines.append(
+                f"- **flaky passed**: {row} -- TF2.md reads {verdict.text}; a"
+                " candidate for pass once that issue is closed and this build"
+                " carries its fix"
+            )
+    return lines
+
+
+def _by_row(results: dict[str, str]) -> tuple[dict[str, dict[str, str]], list[str]]:
+    """Group a report's testcases by the ledger row each is.
+
+    :param results: `parse_junit`'s reading of the report.
+    :returns: each row's testcases, by function name, against their
+        status; and one line per testcase `_ROWS` has no row for.
+    """
+    by_row: dict[str, dict[str, str]] = {}
+    lines: list[str] = []
+    for key, status in sorted(results.items()):
+        stem, function = locate(key)
+        row = row_of(stem, function)
+        if row is not None:
+            by_row.setdefault(row, {})[key.split("::", 1)[1]] = status
+        elif stem not in _NO_ROW:
+            lines.append(
+                f"- **no row**: `{key}` is a testcase `_ROWS` names no row for"
+            )
+        elif status == "fail":
+            lines.append(f"- **no row**: `{key}` fails, and no ledger row covers it")
+    return by_row, lines
+
+
 def main() -> int:
     """Compare the report with the ledger, and print what moved.
 
@@ -1166,9 +1208,10 @@ def main() -> int:
         )
         return 2
     ledger_path, report_path, build = Path(args[0]), Path(args[1]), args[2]
-    lines = moves(
-        ledger_path.read_text(encoding="utf-8"), parse_junit(report_path), build
-    )
+    ledger_text = ledger_path.read_text(encoding="utf-8")
+    results = parse_junit(report_path)
+    lines = moves(ledger_text, results, build)
+    passes = flaky_passes(ledger_text, results, build)
     timeouts = teardown_timeouts(report_path)
     print(f"### TF2.md's btclib-node column against the {build} build")
     print()
@@ -1179,6 +1222,12 @@ def main() -> int:
             print(line)
     else:
         print("Nothing moved: every row agrees with TF2.md.")
+    if passes:
+        print()
+        print("### Flaky rows this run passed, not moves")
+        print()
+        for line in passes:
+            print(line)
     if timeouts:
         print()
         print(f"### Teardown timeouts ({_TEARDOWN_ISSUE}), not verdicts")
