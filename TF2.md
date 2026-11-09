@@ -1155,7 +1155,7 @@ gh api --method GET repos/bitcoin/bitcoin/commits \
 | `rpc_signmessagewithprivkey.py` | [`fa5f29774872`](https://github.com/bitcoin/bitcoin/commit/fa5f29774872) | 2025-12-16 | pass | pass |
 | `feature_chain_tiebreaks.py` | [`20ae9b98eab2`](https://github.com/bitcoin/bitcoin/commit/20ae9b98eab2) | 2026-03-04 | pass, the restart's tip check run per-build ([ISS 35](https://github.com/btclib-org/functional-tests/issues/35)) | pass |
 | `p2p_sendheaders.py` | [`a7acf277dc39`](https://github.com/bitcoin/bitcoin/commit/a7acf277dc39) | 2026-10-02 | pass | flaky ([ISS btclib-node#2172](https://github.com/btclib-org/btclib-node/issues/2172)) |
-| `p2p_fingerprint.py` | [`fa16bc53d79c`](https://github.com/bitcoin/bitcoin/commit/fa16bc53d79c) | 2026-04-16 | pass | pass |
+| `p2p_fingerprint.py` | [`fa16bc53d79c`](https://github.com/bitcoin/bitcoin/commit/fa16bc53d79c) | 2026-04-16 | pass | flaky ([ISS btclib-node#2164](https://github.com/btclib-org/btclib-node/issues/2164)) on the build; pass on a build past [ISS btclib-node#2164](https://github.com/btclib-org/btclib-node/issues/2164) |
 | `rpc_estimatefee.py` | [`4056908f0fea`](https://github.com/bitcoin/bitcoin/commit/4056908f0fea) | 2026-09-29 | pass, the `options` checks and the estimator refusal run per-build ([ISS 35](https://github.com/btclib-org/functional-tests/issues/35)) | pass |
 | `feature_assumevalid.py` | [`fa16bc53d79c`](https://github.com/bitcoin/bitcoin/commit/fa16bc53d79c) | 2026-04-16 | pass, its log lines read per-build ([ISS 35](https://github.com/btclib-org/functional-tests/issues/35)) | skip (assume_valid) |
 | `feature_rbf.py` | [`1a85ca1dff1f`](https://github.com/bitcoin/bitcoin/commit/1a85ca1dff1f) | 2026-04-24 | pass, the replacement rules' wording asserted per-build ([ISS 35](https://github.com/btclib-org/functional-tests/issues/35)) | skip (incremental_relay_fee) |
@@ -1479,11 +1479,14 @@ no entry here is a `bitcoind only` row, or has its reason in the docstring of
   is mined, the nodes can stay on different tips of equal work
   ([ISS btclib-node#2172](https://github.com/btclib-org/btclib-node/issues/2172)),
   and the test fails; where they converge, it passes.
-- `p2p_fingerprint.py`: Core's claim in full. Once the clock set back is
-  released, the node drops the peer for silence, though it connected under a
-  minute ago, where its silence check runs before the peer next sends
-  ([ISS btclib-node#2164](https://github.com/btclib-org/btclib-node/issues/2164)).
-  A run where the check comes first reports the row as a regression.
+- `p2p_fingerprint.py`: Core's claim in full. Flaky on a build without the
+  fix of
+  [ISS btclib-node#2164](https://github.com/btclib-org/btclib-node/issues/2164),
+  by a race: once the clock set back is released, the node can drop the peer
+  for silence, though it connected under a minute ago, where its silence
+  check runs before the peer next sends, and the test fails; where the peer
+  sends first, it passes. A build past the issue keeps the peer, as Core
+  does, and passes.
 - `rpc_estimatefee.py`: Core's claim in full.
 - `p2p_nobloomfilter_messages.py`: the filtered-block step alone, a wire row
   and a log row ([ISS 5](https://github.com/btclib-org/functional-tests/issues/5)).
