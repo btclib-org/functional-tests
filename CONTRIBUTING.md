@@ -510,8 +510,8 @@ of it, with the options `test_framework.py` and `test_runner.py` give
 them.
 
 **The interpreter.** `requires-python` is `>=3.12`, by the maintainer's
-own decision departing from section 1 of the organization standard and
-from btclib-org/.github#1324 -- `pyproject.toml`'s own comment on
+own decision departing from section 1 of the organization's standard
+and from btclib-org/.github#1324 -- `pyproject.toml`'s own comment on
 `requires-python` has the measurement, `typing.override` and `sphinx`
 both needing 3.12 and nothing here needing more. `uv run` fetches that
 interpreter on its own where none is on `PATH`, whatever floor is
@@ -730,7 +730,7 @@ python .github/scripts/tf2_ledger_census.py \
 `codeql.yml` has no line here: this repository does not carry it yet.
 
 `sourcery.yml` has no line here: section 10 of
-[the organization standard](https://github.com/btclib-org/.github#the-set-and-its-cadence)
+[the organization's standard](https://github.com/btclib-org/.github#the-set-and-its-cadence)
 says why it is a pull request's check and not a local gate.
 
 `node-integration.yml`, the `bitcoind` job -- btclib-org/.github's
@@ -820,8 +820,8 @@ commit pushed is `verified`; [the standard's *Signatures*][s-sigs] has the rule.
 | `vendored-vectors` | weekly | the pins in `TF2.md`, and the census |
 
 Which day each of the rest runs is section 10 of
-[the organization standard](https://github.com/btclib-org/.github), and
-not this file's to restate.
+[the organization's standard](https://github.com/btclib-org/.github),
+and not this file's to restate.
 
 The required checks run on `ubuntu-latest`. The suite, pre-commit, the
 docs build and the integration tests run on the version

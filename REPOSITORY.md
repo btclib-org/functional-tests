@@ -6,12 +6,13 @@ carrying it, so that a session fixing a bug in the package does not hold it
 in context.
 
 The branch rules and the repository settings live *outside* the
-repository. What is recorded is the settings the organization standard
-asks about — the ones section 16's checklist sets on a new repository,
-the ones a section of the standard states a rule for, and the ones a
-behaviour it describes rests on — together with whatever a call quoted
-for one of those answers alongside it. That is this file's scope, and
-*What this file passes over* at the foot says what falls outside it.
+repository. What is recorded is the settings the organization's
+standard asks about — the ones section 16's checklist sets on a new
+repository, the ones a section of the standard states a rule for, and
+the ones a behaviour it describes rests on — together with whatever a
+call quoted for one of those answers alongside it. That is this file's
+scope, and *What this file passes over* at the foot says what falls
+outside it.
 
 The topics and `.homepage` have a second form in the tree —
 `pyproject.toml`'s `keywords` and its `[project.urls] homepage` — so
@@ -447,8 +448,8 @@ gives](https://github.com/btclib-org/.github/blob/main/README.md#signatures).
 ## Publishing
 
 **Nothing is published.** No `release.yml`, no `pypi-install.yml`:
-section 2 of the organization standard does not ask them of a tier-2
-tree, which this is.
+section 2 of the organization's standard does not ask them of a
+tier-2 tree, which this is.
 
 **No `pypi` or `testpypi` environment exists on this repository.**
 Section 11's own rule is that each is named by a job of the release

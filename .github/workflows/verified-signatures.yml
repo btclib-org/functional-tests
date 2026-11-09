@@ -43,7 +43,7 @@ concurrency:
 
 jobs:
   # the job itself is btclib-org/.github's, called at a tagged commit
-  # (section 10 of btclib-org/.github's README.md)
+  # (section 10 of the organization's standard)
   verified-signatures:
     uses: btclib-org/.github/.github/workflows/reusable-verified-signatures.yml@5be4b0fbb5231cff001a3ee0eaa8f7d82bffef11 # v2026.11.5
     with:
