@@ -9,7 +9,7 @@ prose can be reviewed, a number is right or wrong invisibly. Checking
 the number against the entries would make it a line every open branch
 has to edit, so the file states none, and this module fails on a count.
 
-RELEASE_NOTES.md is not read here: section 2 of the organization
+RELEASE_NOTES.md is not read here: section 2 of the organization's
 standard gives it to a repository that publishes, and this tree is
 tier 2, owing no release (CONTRIBUTING.md's *A version, and no
 release*).

@@ -7,9 +7,9 @@
 The gate is `coverage_fail_under` and the guard on it. coverage looks
 for its configuration in the directory the process started in, so a run
 started from `tests/` finds no `fail_under`, no `source` and no
-`branch = true`. Section 8 of the organization standard leaves a tree to
-point such a run at its configuration or to make it say it is ungated,
-and this file is the second of the two: such a run is refused
+`branch = true`. Section 8 of the organization's standard leaves a tree
+to point such a run at its configuration or to make it say it is
+ungated, and this file is the second of the two: such a run is refused
 (btclib-org/.github#443).
 
 `stop_all`, `stash_or_report`, `fold_worker_tally` and `AdapterFactory`
