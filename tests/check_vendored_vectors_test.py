@@ -19,10 +19,12 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import runpy
 import subprocess
 import sys
 from pathlib import Path
 from types import ModuleType
+from unittest.mock import Mock
 
 import pytest
 
@@ -62,22 +64,27 @@ def checker(monkeypatch: pytest.MonkeyPatch) -> ModuleType:
 
 
 class FakeGh:
-    """A `subprocess.run` stand-in, answering `gh api .../commits` alone.
+    """A `subprocess.run` stand-in for `gh api .../commits` and `gh issue`.
 
     `commits` maps a path to the (sha, date) the listing names first; a
-    path absent from it answers with an empty list. Every call is
-    recorded in `calls`.
+    path absent from it answers with an empty list. `issues` holds the
+    numbers of the open issues `gh issue list` answers with. Every call
+    is recorded in `calls`.
     """
 
     def __init__(self) -> None:
         self.commits: dict[str, tuple[str, str]] = {}
+        self.issues: list[int] = []
         self.calls: list[list[str]] = []
 
     def __call__(
         self, argv: list[str], **_kwargs: object
     ) -> subprocess.CompletedProcess[str]:
-        """Record the call, and answer the path it asked about."""
+        """Record the call, and answer the path or the issues it asked about."""
         self.calls.append(list(argv))
+        if argv[1] == "issue":
+            issues = [{"number": number} for number in self.issues]
+            return subprocess.CompletedProcess(argv, 0, stdout=json.dumps(issues))
         path = next(a.removeprefix("path=") for a in argv if a.startswith("path="))
         found = self.commits.get(path)
         commits = (
@@ -288,3 +295,210 @@ def test_a_server_error_that_persists_is_raised_after_the_last_attempt(
         checker._latest_commit("r", "p")
 
     assert len(calls) == 3
+
+
+def test_a_placeholder_path_is_skipped(checker: ModuleType) -> None:
+    """A `<name>` in a path is one pin standing in for several files."""
+    ledger = _LEDGER.replace(_PATH, "test/functional/data/<name>.json")
+    assert checker._entries_at_tip(ledger) == (
+        [],
+        ["`bignum.py` (one pin serves several files)"],
+    )
+
+
+def test_blocks_skipped_alike_under_one_heading_give_one_line(
+    checker: ModuleType,
+) -> None:
+    """A second block under the same heading adds no second, identical line."""
+    block = _LEDGER.removeprefix("### `bignum.py`\n\n").replace("behind  0\n", "")
+    ledger = f"### `bignum.py`\n\n{block}\n{block}"
+    assert checker._entries_at_tip(ledger) == (
+        [],
+        ["`bignum.py` (no behind line at all)"],
+    )
+
+
+def test_a_pin_at_its_tip_is_not_drift(
+    checker: ModuleType, fake_gh: FakeGh, tmp_path: Path
+) -> None:
+    """The listing naming the pinned commit itself is a pin still current."""
+    ledger = tmp_path / "TF2.md"
+    ledger.write_text(_LEDGER, encoding="utf-8")
+    fake_gh.commits[_PATH] = (_PIN, "2026-03-24")
+    assert checker.find_drift(ledger) == ([], [])
+
+
+def test_the_issue_body_lists_what_was_skipped(
+    checker: ModuleType, tmp_path: Path
+) -> None:
+    """Each heading this run did not check is named under the drift."""
+    drift = checker.Drift(
+        checker.Entry("h", "bitcoin/bitcoin", _PATH, _PIN), _REMOVING_SHA, "2019-10-30"
+    )
+    body = checker._issue_body(tmp_path / "TF2.md", [drift], ["g (no fenced block)"])
+    assert body.endswith(
+        "\n\nNot checked by this run, for the reason named:\n- g (no fenced block)"
+    )
+    assert "Not checked" not in checker._issue_body(tmp_path / "TF2.md", [drift], [])
+
+
+def _drift(checker: ModuleType) -> object:
+    """Return one drifted pin, for the tests of `report`."""
+    entry = checker.Entry("h", "bitcoin/bitcoin", _PATH, _PIN)
+    return checker.Drift(entry, _REMOVING_SHA, "2019-10-30")
+
+
+def _issue_calls(fake_gh: FakeGh, verb: str) -> list[list[str]]:
+    """Return every `gh issue <verb>` call made."""
+    return [call[2:] for call in fake_gh.calls if call[1:3] == ["issue", verb]]
+
+
+def test_report_opens_an_issue_on_drift(
+    checker: ModuleType, fake_gh: FakeGh, tmp_path: Path
+) -> None:
+    """Drift with no issue open creates one, under the title given."""
+    checker.report(tmp_path / "TF2.md", "a title", [_drift(checker)], [])
+    [create] = _issue_calls(fake_gh, "create")
+    assert create[create.index("--title") + 1] == "a title"
+    assert _REMOVING_SHA in create[create.index("--body") + 1]
+
+
+def test_report_edits_the_issue_already_open(
+    checker: ModuleType, fake_gh: FakeGh, tmp_path: Path
+) -> None:
+    """Drift with an issue open rewrites that issue's body."""
+    fake_gh.issues = [42]
+    checker.report(tmp_path / "TF2.md", "a title", [_drift(checker)], [])
+    [edit] = _issue_calls(fake_gh, "edit")
+    assert edit[:2] == ["edit", "42"]
+    assert _REMOVING_SHA in edit[edit.index("--body") + 1]
+    assert _issue_calls(fake_gh, "create") == []
+
+
+def test_report_closes_the_issue_once_no_pin_drifts(
+    checker: ModuleType, fake_gh: FakeGh, tmp_path: Path
+) -> None:
+    """No drift closes whatever issue was tracking it."""
+    fake_gh.issues = [42]
+    checker.report(tmp_path / "TF2.md", "a title", [], [])
+    [close] = _issue_calls(fake_gh, "close")
+    assert close[:2] == ["close", "42"]
+
+
+def test_report_does_nothing_with_no_drift_and_no_issue(
+    checker: ModuleType, fake_gh: FakeGh, tmp_path: Path
+) -> None:
+    """No drift and no issue open: the search is the only call."""
+    checker.report(tmp_path / "TF2.md", "a title", [], [])
+    assert [call[1:3] for call in fake_gh.calls] == [["issue", "list"]]
+
+
+def test_main_prints_each_drift_and_each_skip(
+    checker: ModuleType,
+    fake_gh: FakeGh,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """`--dry-run` prints what it found and touches no issue."""
+    gone = "test/functional/test_framework/gone.py"
+    ledger = tmp_path / "TF2.md"
+    ledger.write_text(
+        f"{_LEDGER}\n{_LEDGER.replace('bignum.py', 'gone.py')}\n### `group`\n",
+        encoding="utf-8",
+    )
+    fake_gh.commits[_PATH] = (_REMOVING_SHA, "2019-10-30")
+    monkeypatch.setattr(sys, "argv", ["prog", str(ledger), "a title", "--dry-run"])
+    assert checker.main() == 0
+    out = capsys.readouterr().out
+    assert (
+        f"BEHIND: `bignum.py` pinned to {_PIN}, latest commit touching it is"
+        f" {_REMOVING_SHA} (2019-10-30)"
+    ) in out
+    assert (
+        f"NO COMMIT: `gone.py` pinned to {_PIN}, and no commit on the default"
+        f" branch of bitcoin/bitcoin touches {gone}"
+    ) in out
+    assert "BEHIND: `gone.py`" not in out
+    assert "SKIPPED: `group` (no fenced block)" in out
+    assert "Every checked pin" not in out
+    assert _issue_calls(fake_gh, "list") == []
+
+
+def test_main_reports_drift_to_the_issue_already_open(
+    checker: ModuleType,
+    fake_gh: FakeGh,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Without `--dry-run`, drift rewrites the open issue with all it found."""
+    ledger = tmp_path / "TF2.md"
+    ledger.write_text(f"{_LEDGER}\n### `group`\n", encoding="utf-8")
+    fake_gh.commits[_PATH] = (_REMOVING_SHA, "2019-10-30")
+    fake_gh.issues = [42]
+    monkeypatch.setattr(sys, "argv", ["prog", str(ledger), "a title"])
+    assert checker.main() == 0
+    [edit] = _issue_calls(fake_gh, "edit")
+    assert edit[:2] == ["edit", "42"]
+    body = edit[edit.index("--body") + 1]
+    assert _REMOVING_SHA in body
+    assert "- `group` (no fenced block)" in body
+    assert _issue_calls(fake_gh, "create") == []
+    assert _issue_calls(fake_gh, "close") == []
+
+
+def test_main_reports_no_drift_and_closes_the_issue(
+    checker: ModuleType,
+    fake_gh: FakeGh,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Without `--dry-run`, a clean run says so and closes the open issue."""
+    ledger = tmp_path / "TF2.md"
+    ledger.write_text(_LEDGER, encoding="utf-8")
+    fake_gh.commits[_PATH] = (_PIN, "2026-03-24")
+    fake_gh.issues = [42]
+    monkeypatch.setattr(sys, "argv", ["prog", str(ledger), "a title"])
+    assert checker.main() == 0
+    assert "Every checked pin is still at upstream's tip." in capsys.readouterr().out
+    assert [close[:2] for close in _issue_calls(fake_gh, "close")] == [["close", "42"]]
+
+
+@pytest.mark.parametrize(
+    "argv", [["prog", "TF2.md"], ["prog", "TF2.md", "a title", "extra"]]
+)
+def test_main_usage_error(
+    checker: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    argv: list[str],
+) -> None:
+    """Anything but a path and a title is a usage error, exit 2."""
+    monkeypatch.setattr(sys, "argv", argv)
+    assert checker.main() == 2
+    assert capsys.readouterr().err.startswith("usage: prog <ledger path>")
+
+
+@pytest.mark.parametrize("dry_run, status", [(False, 2), (True, 0)])
+def test_the_script_exits_with_main_s_own_status(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, dry_run: bool, status: int
+) -> None:
+    """Run as the workflow step runs it, the exit status is `main`'s.
+
+    A usage error answers 2; a `--dry-run` over a ledger with no fenced
+    block calls no `gh` and answers 0. The script runs as its own copy,
+    which the `checker` fixture's stand-in does not reach, so
+    `subprocess.run` is a `Mock` that raises: a call fails the test
+    rather than reaching GitHub. A stub function would leave its body a
+    line no green run covers.
+    """
+    refuse = Mock(side_effect=AssertionError("the script ran a subprocess"))
+    monkeypatch.setattr(subprocess, "run", refuse)
+    ledger = tmp_path / "TF2.md"
+    ledger.write_text("### `group`\n", encoding="utf-8")
+    argv = [str(_SCRIPT), str(ledger), "a title", "--dry-run"]
+    monkeypatch.setattr(sys, "argv", argv if dry_run else argv[:1])
+    with pytest.raises(SystemExit) as excinfo:
+        runpy.run_path(str(_SCRIPT), run_name="__main__")
+    assert excinfo.value.code == status

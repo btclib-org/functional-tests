@@ -255,7 +255,10 @@ extend-glob = ["CHANGELOG.md", ".pre-commit-config.yaml", "TF2.md"]
 extend-ignore-re = ['`[^`]*`']
 
 [tool.coverage.run]
-source = ["btclib_functional_tests", "tests"]
+# .github/scripts is not an importable package: coverage measures it by
+# path, so a branch of a workflow's script that no test reaches fails
+# the floor as one of the package's would
+source = ["btclib_functional_tests", "tests", ".github/scripts"]
 # tests/integration is omitted because the ratchet measures what an
 # ordinary run executes, and those tests skip themselves without
 # TF2_INTEGRATION: their bodies would be uncovered lines of tests/ at
