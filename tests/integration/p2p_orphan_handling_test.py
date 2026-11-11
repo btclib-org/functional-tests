@@ -4,8 +4,8 @@
 
 """Core's `p2p_orphan_handling`, as bodies over each node.
 
-Read from Core's `test/functional/p2p_orphan_handling.py` (`9cc7dc50bdc9`,
-2026-08-17): which peers a node asks for the missing parents of an
+Read from Core's `test/functional/p2p_orphan_handling.py` (`902190b6242a`,
+2026-11-04): which peers a node asks for the missing parents of an
 orphan it keeps (`Capability.ORPHANAGE`), and when. Each of the checks
 below is one of Core's `test_*` methods, a body over a fresh node:
 
@@ -97,17 +97,12 @@ What differs from Core's file besides:
   ahead of the output `target_vsize` pads it with; here every input is
   signed, after that output, a padded transaction paying a satoshi more
   fee for each signing retried to reach its size;
-- Core's inherit-rejection check hands `assert_never_requested` a hex
-  string where a requested hash is an integer, so none of those checks
-  can fail; here each reads the hash, once the node's clock has moved
-  past the delay a parent's request waits. The refused parent's check
-  reads the latest `getdata` its peer had, which names the child: that
-  peer was asked for the parent when it relayed it, under the wtxid that
-  is also its txid;
 - the maximal-package check asks `testmempoolaccept` about each large
   orphan over a connection of its own per call where the node serves
   HTTP through libevent (`rpc_echo_payload_test.py`'s module
-  docstring has why); Core's keeps one connection.
+  docstring has why); Core's keeps one connection;
+- Core's `test_orphan_in_mempool` is not ported
+  ([ISS 611](https://github.com/btclib-org/functional-tests/issues/611)).
 
 An orphan is taken into the mempool once a block confirms its parent in
 `v32.0` and later, from
@@ -226,7 +221,7 @@ _OVERLY_LARGE_VSIZE = _MAX_STANDARD_TX_WEIGHT // 4 + 1
 # the same, so this test fails against such a build
 _RECONSIDERS_ON_BLOCK_VERSION = 320000
 
-# Core's own `DEFAULT_ANCESTOR_LIMIT` (`test_framework/messages.py`)
+# Core's own `DEFAULT_ANCESTOR_LIMIT` (`test_framework/mempool_util.py`)
 _DEFAULT_ANCESTOR_LIMIT = 25
 
 # Core's own `test_maximal_package_protected`: the large orphans it makes,
@@ -732,23 +727,23 @@ def descendants_of_a_rejected_parent_are_rejected_too(
         # announcing by txid
         peer3 = RelayConn.inbound(stack, node, wtxidrelay=False)
 
-        _relay_transaction(peer1, clock, parent_overly_large_nonsegwit)
+        # relayed by peer2, so that peer1, which relays the child, is never
+        # asked for it
+        _relay_transaction(peer2, clock, parent_overly_large_nonsegwit)
         assert parent_overly_large_nonsegwit.id.hex() not in _mempool(node)
 
         # the child is refused, not kept, and its parent not asked for
-        # again once an orphan's would be
         _relay_transaction(peer1, clock, child)
         assert len(_mempool(node)) == 0
         assert not in_orphanage(node, child)
-        clock.bump(_NONPREF_PEER_TX_DELAY + _TXID_RELAY_DELAY)
-        peer1.sync_with_ping()
-        assert [item.hash for item in peer1.last_getdata] == [child.hash]
+        clock.bump(_TXREQUEST_TIME_SKIP)
+        peer1.assert_never_requested(parent_overly_large_nonsegwit.id)
 
         # the grandchild is refused too, its parent asked for by neither hash
         _relay_transaction(peer2, clock, grandchild)
         assert len(_mempool(node)) == 0
         assert not in_orphanage(node, grandchild)
-        clock.bump(_NONPREF_PEER_TX_DELAY + _TXID_RELAY_DELAY)
+        clock.bump(_TXREQUEST_TIME_SKIP)
         peer2.assert_never_requested(child.id)
         peer2.assert_never_requested(child.hash)
 
@@ -1061,10 +1056,10 @@ def a_parent_gone_missing_is_requested(
 
         # peer1 disconnects, and peer2 is asked for both parents
         peer1.peer.close()
-        wait_until(lambda: len(node.rpc.call("getpeerinfo")) == 1, timeout=_WAIT)
+        # once the node has dropped peer1's announcement and its requests
+        wait_until(lambda: _announcers(node) == 1, timeout=_WAIT)
         peer2.sync_with_ping()
         clock.bump(_TXREQUEST_TIME_SKIP)
-        wait_until(lambda: _announcers(node) == 1, timeout=_WAIT)
         peer2.wait_for_parent_requests([parent_peekaboo_ab.id, parent_missing.id])
         peer2.send_and_ping(_tx(parent_missing))
         peer2.send_and_ping(_tx(parent_peekaboo_ab))

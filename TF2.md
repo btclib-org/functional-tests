@@ -1059,11 +1059,11 @@ gh api --method GET repos/bitcoin/bitcoin/commits \
 | `p2p_tx_download.py` (tx requests) | same | same | pass | pass |
 | `p2p_tx_download.py` (rejects) | same | same | pass | skip (maxmempool) |
 | `p2p_tx_download.py` (mismatch) | same | same | pass | pass |
-| `p2p_blocksonly.py` (`-blocksonly`, wire) | [`278710a88d8f`](https://github.com/bitcoin/bitcoin/commit/278710a88d8f) | 2026-06-17 | pass | skip |
+| `p2p_blocksonly.py` (`-blocksonly`, wire) | [`22535b460568`](https://github.com/bitcoin/bitcoin/commit/22535b460568) | 2026-10-13 | pass | skip |
 | `p2p_blocksonly.py` (`-blocksonly`, log) | same | same | pass | skip |
 | `p2p_blocksonly.py` (block-relay-only, wire) | same | same | pass | pass |
 | `p2p_blocksonly.py` (block-relay-only, log) | same | same | pass | skip |
-| `p2p_orphan_handling.py` (arrival timing) | [`9cc7dc50bdc9`](https://github.com/bitcoin/bitcoin/commit/9cc7dc50bdc9) | 2026-08-17 | pass | pass |
+| `p2p_orphan_handling.py` (arrival timing) | [`902190b6242a`](https://github.com/bitcoin/bitcoin/commit/902190b6242a) | 2026-11-04 | pass | pass |
 | `p2p_orphan_handling.py` (rejected parents) | same | same | pass | pass |
 | `p2p_orphan_handling.py` (multiple parents) | same | same | pass | pass |
 | `p2p_orphan_handling.py` (overlapping parents) | same | same | pass | pass |
