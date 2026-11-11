@@ -75,9 +75,7 @@ def _classify(fn: ast.FunctionDef) -> str:
         return "other"
     if _is_fail_call(body[-1]) and all(_is_del_or_require(s) for s in body[:-1]):
         return "stub"
-    if all(_is_del_or_require(s) for s in body):
-        return "bare"
-    return "other"
+    return "bare" if all(_is_del_or_require(s) for s in body) else "other"
 
 
 def _required_capabilities(fn: ast.FunctionDef) -> tuple[str, ...]:

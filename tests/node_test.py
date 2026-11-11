@@ -1300,9 +1300,7 @@ def test_disconnect_nodes_disconnectnodes_and_waits_for_the_peer_to_go(
             super().call(method, params)
             if method == "getpeerinfo":
                 self._polls += 1
-                if self._polls == 1:
-                    return [{"addr": "127.0.0.1:2222"}]
-                return []
+                return [{"addr": "127.0.0.1:2222"}] if self._polls == 1 else []
             return None
 
     first = _FakeAdapter("fake-node", tmp_path / "first", 0, 1111, rpc=_PeerInfoRpc())
@@ -1320,9 +1318,7 @@ def test_disconnect_nodes_ignores_a_peer_at_a_different_address(
         @override
         def call(self, method: str, params: list[object] | None = None) -> object:
             super().call(method, params)
-            if method == "getpeerinfo":
-                return [{"addr": "127.0.0.1:9999"}]
-            return None
+            return [{"addr": "127.0.0.1:9999"}] if method == "getpeerinfo" else None
 
     first = _FakeAdapter("fake-node", tmp_path / "first", 0, 1111, rpc=_OtherPeerRpc())
     second = _FakeAdapter("fake-node", tmp_path / "second", 0, 2222, rpc=_FakeRpc())
@@ -1445,9 +1441,7 @@ def test_wait_until_disconnected_returns_once_the_peer_is_gone(
             super().call(method, params)
             assert method == "getpeerinfo"
             self._polls += 1
-            if self._polls == 1:
-                return [{"addr": "127.0.0.1:2222"}]
-            return []
+            return [{"addr": "127.0.0.1:2222"}] if self._polls == 1 else []
 
     node = _FakeAdapter("fake-node", tmp_path / "node", 0, 1111, rpc=_PeerInfoRpc())
     peer = _FakeAdapter("fake-node", tmp_path / "peer", 0, 2222, rpc=_FakeRpc())
