@@ -43,17 +43,18 @@ then `Capability.INVALIDATE_BLOCK`, `Capability.CONNECT` and
 `-whitelist=noban,in,out@127.0.0.1` Core's `noban_tx_relay` starts every
 node with, which asks for no capability.
 
-Which limit the nodes run is read off the first node's own `help`, as
-`mempool_updatefromblock_test.py` reads it: a node listing
-`getmempoolcluster` runs the cluster mempool. There the second node's
-option is `-limitclustercount` (`Capability.LIMIT_CLUSTER_COUNT`), asked
-for last. A build before the cluster mempool (`v31.0`) has neither the RPC
-nor the option, and limits by ancestors and descendants, as Core's file of
-that build does: the chain and the family are the default 25, the second
-node is started with `-limitancestorcount=5` and
-`-limitdescendantcount=10`, it holds the first 5 of the chain and then the
-parent with the first 10 of the family, and a transaction one past the
-chain or the family is refused as `too-long-mempool-chain`.
+Which limit the nodes run is read off the first node's capabilities, as
+`mempool_updatefromblock_test.py` reads it: a node declaring
+`Capability.CLUSTER_LINEARIZATION` runs the cluster mempool. There the
+second node's option is `-limitclustercount`
+(`Capability.LIMIT_CLUSTER_COUNT`), asked for last. A build before the
+cluster mempool (`v31.0`) has neither the capability nor the option, and
+limits by ancestors and descendants, as Core's file of that build does:
+the chain and the family are the default 25, the second node is started
+with `-limitancestorcount=5` and `-limitdescendantcount=10`, it holds the
+first 5 of the chain and then the parent with the first 10 of the family,
+and a transaction one past the chain or the family is refused as
+`too-long-mempool-chain`.
 
 What differs from Core's file:
 
@@ -162,13 +163,6 @@ _BROADCAST_TIMEOUT = 60.0
 _SECOND_MEMPOOL_TIMEOUT = 10.0
 
 _TX_TYPES = frozenset({InventoryType.MSG_TX, InventoryType.MSG_WTX})
-
-
-def _has_cluster_mempool(node: NodeAdapter) -> bool:
-    """Return whether `node` runs the cluster mempool, read off its `help`."""
-    text = node.rpc.call("help")
-    assert isinstance(text, str), text
-    return "getmempoolcluster" in text
 
 
 def _mempool(node: NodeAdapter) -> list[str]:
@@ -578,7 +572,7 @@ def mempool_tracks_ancestors_and_descendants(
     require(Capability.INVALIDATE_BLOCK, node0.capabilities, skip_counts)
     require(Capability.CONNECT, node0.capabilities, skip_counts)
     require(Capability.MINE, node0.capabilities, skip_counts)
-    clustered = _has_cluster_mempool(node0)
+    clustered = Capability.CLUSTER_LINEARIZATION in node0.capabilities
     if clustered:
         require(Capability.LIMIT_CLUSTER_COUNT, node1.capabilities, skip_counts)
     limit = _DEFAULT_CLUSTER_LIMIT if clustered else _DEFAULT_ANCESTOR_LIMIT

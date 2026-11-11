@@ -22,10 +22,11 @@ assertion of Core's own kept. It asks for `Capability.INCREMENTAL_RELAY_FEE`,
 and `Capability.MINE`.
 
 The replacement rules are of two generations, and the body reads which
-one the node runs off its own `help`: a node naming `getmempoolcluster`
-runs those of the cluster mempool (bitcoin/bitcoin#33629, first in
-`v31.0`), any other the earlier ones. Both refuse the same replacements
-but one, and say so in different words where Core's file matches them:
+one the node runs off its capabilities: a node declaring
+`Capability.CLUSTER_REPLACEMENT` runs those of the cluster mempool
+(bitcoin/bitcoin#33629, first in `v31.0`), any other the earlier ones.
+Both refuse the same replacements but one, and say so in different words
+where Core's file matches them:
 
 - a replacement paying no more than what it replaces is refused for a
   feerate no higher, or for too few additional fees to relay;
@@ -189,13 +190,6 @@ class _Rules:
             f"too many potential replacements, rejecting replacement {txid}; "
             f"too many potential replacements {count}"
         )
-
-
-def _has_cluster_mempool(node: NodeAdapter) -> bool:
-    """Return whether `node` runs the cluster mempool, read off its `help`."""
-    text = node.rpc.call("help")
-    assert isinstance(text, str), text
-    return "getmempoolcluster" in text
 
 
 def _hex(tx: Tx) -> str:
@@ -737,7 +731,7 @@ def replace_by_fee_follows_its_rules(
         Capability.MINE,
     ):
         require(capability, node.capabilities, skip_counts)
-    rules = _Rules(clustered=_has_cluster_mempool(node))
+    rules = _Rules(clustered=Capability.CLUSTER_REPLACEMENT in node.capabilities)
     datacarrier = f"-datacarriersize={_DATACARRIER_SIZE}"
     limits = () if rules.clustered else _LEGACY_LIMITS
     node.restart(

@@ -1433,8 +1433,9 @@ no entry here is a `bitcoind only` row, or has its reason in the docstring of
   the (outbound) row, which also asks for `mine`, `typed_outbound` and
   `debug_log`.
 - `mempool_packages.py`: Core's claim in full. Skips on
-  `limit_cluster_count`: btclib-node runs the cluster mempool, read off its
-  `help`, and registers no `-limitclustercount` for the second node.
+  `limit_cluster_count`: btclib-node runs the cluster mempool, declaring
+  `cluster_linearization`, and registers no `-limitclustercount` for the
+  second node.
 - `feature_versionbits_warning.py`: Core's claim. Skips on `alert_notify`
   ([ISS btclib-node#1475](https://github.com/btclib-org/btclib-node/issues/1475)).
 - `p2p_headers_sync_with_minchainwork.py`: Core's claim in full. Skips on
