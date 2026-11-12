@@ -1317,8 +1317,7 @@ no entry here is a `bitcoind only` row, or has its reason in the docstring of
 - `rpc_orphans.py`: Core's claim in full.
 - `p2p_ibd_stalling.py`: the log rows skip on `debug_log`. The (wire) row
   is flaky on a build whose `getpeerinfo` can still list the stalling peer
-  once that peer sees its connection close: it fails on most runs and
-  passes on some. A build past
+  once that peer sees its connection close. A build past
   [ISS btclib-node#2416](https://github.com/btclib-org/btclib-node/issues/2416)
   passes.
 - `p2p_tx_privacy.py`: a `Peer` sends `version` and `wtxidrelay` by hand
