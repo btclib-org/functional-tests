@@ -182,12 +182,13 @@ class _Conn(Conn):
         if message.command == "inv":
             self.block_announced = True
             self.last_blockhash_announced = Inv.parse(message.payload).items[-1].hash
-        elif message.command == "headers":
-            if headers := Headers.parse(message.payload, check_validity=False).headers:
-                self.block_announced = True
-                # headers may be announced over several messages
-                self.recent_headers_announced += [header.hash for header in headers]
-                self.last_blockhash_announced = headers[-1].hash
+        elif message.command == "headers" and (
+            headers := Headers.parse(message.payload, check_validity=False).headers
+        ):
+            self.block_announced = True
+            # headers may be announced over several messages
+            self.recent_headers_announced += [header.hash for header in headers]
+            self.last_blockhash_announced = headers[-1].hash
 
     @override
     def wait_until(
