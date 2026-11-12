@@ -334,7 +334,7 @@ def an_invalid_private_key_or_transaction_is_refused(
     _refused(node, [tx, ["123"]], _INVALID_ADDRESS_OR_KEY, "Invalid private key")
     _refused(
         node,
-        [tx + "00", [_keypair()[1]]],
+        [f"{tx}00", [_keypair()[1]]],
         _DESERIALIZATION,
         "TX decode failed. Make sure the tx has at least one input.",
     )

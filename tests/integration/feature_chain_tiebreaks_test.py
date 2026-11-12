@@ -231,13 +231,12 @@ def _chain_split_in_memory(node: NodeAdapter) -> None:
             )
         ]
         for i in range(1, _TREE_BLOCKS + 1):
-            blocks.append(
-                _block(
-                    blocks[(i - 1) >> 1].header.hash,
-                    start_height + (i + 1).bit_length(),
-                    _time(blocks[-1]) + 1,
-                )
+            block = _block(
+                blocks[(i - 1) >> 1].header.hash,
+                start_height + (i + 1).bit_length(),
+                _time(blocks[-1]) + 1,
             )
+            blocks.append(block)
 
         _send_block_and_test(peer, node, blocks[0], success=True)
         assert _best(node) == blocks[0].header.hash.hex()

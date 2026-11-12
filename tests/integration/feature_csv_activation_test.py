@@ -136,9 +136,7 @@ def _script_int(value: int) -> int | str:
     """Return `value` the way Core's `CScript` writes it, small as an opcode."""
     if value == -1:
         return "OP_1NEGATE"
-    if 1 <= value <= 16:
-        return f"OP_{value}"
-    return value
+    return f"OP_{value}" if 1 <= value <= 16 else value
 
 
 @dataclass

@@ -206,10 +206,9 @@ class _Sniffer:
                 connection.settimeout(scaled(_WAIT))
                 start = b""
                 try:
-                    while len(start) < len(_MAGIC):
-                        chunk = connection.recv(len(_MAGIC) - len(start))
-                        if not chunk:
-                            break
+                    while len(start) < len(_MAGIC) and (
+                        chunk := connection.recv(len(_MAGIC) - len(start))
+                    ):
                         start += chunk
                 except OSError:
                     continue
