@@ -686,7 +686,7 @@ itself:
 
 ```shell
 uv run --locked --exact --no-default-groups --group docs \
-    sphinx-build -n -W -b html docs/source docs/build/html
+    sphinx-build -n -W -b html docs/source docs/build/html || exit $?
 if grep -rn 'href="#\.\.\?/' docs/build/html --include='*.html'; then
     echo "::error::the links above resolve to no page (unresolved relative path)"
     exit 1
@@ -705,17 +705,17 @@ rather than at the file's page here. Section 2 of the standard, *The
 documentation*, is the rule:
 
 ```shell
-served=$(mktemp -d)
-git clone --quiet --filter=blob:none --sparse \
-    https://github.com/btclib-org/.github "$served"
-git -C "$served" sparse-checkout set .github/scripts
-git -C "$served" checkout --quiet \
-    "$(sed -n 's/.*reusable-docs\.yml@\([0-9a-f]*\).*/\1/p' .github/workflows/docs.yml)"
 found=0
+pin=$(sed -n 's/.*reusable-docs\.yml@\([0-9a-f]*\).*/\1/p' .github/workflows/docs.yml)
+served=$(mktemp -d) &&
+git clone --quiet --filter=blob:none --sparse \
+    https://github.com/btclib-org/.github "$served" &&
+git -C "$served" sparse-checkout set .github/scripts &&
+git -C "$served" checkout --quiet "$pin" &&
 uv run --no-project --python 3.15 \
     "$served"/.github/scripts/check_included_links.py docs/build/html || found=$?
 rm -rf "$served"
-test "$found" -eq 0
+test "$found" -eq 0 || exit "$found"
 ```
 
 `vendored-vectors.yml`, the `vectors` job re-checks every framework pin
