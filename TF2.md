@@ -154,7 +154,8 @@ behind  0 revisions; that commit is the tip of the path
 Verdict: **covered**. `b58.address_from_h160` and `b58.h160_from_address`
 for the base58 addresses, `b32.address_from_witness` and
 `b32.witness_from_address` for the segwit ones, each over the codec
-below it -- `base58` and `bech32`, a split Core's file does not make.
+below it -- `base58-bech32`'s `base58` and `bech32`, a split Core's file
+does not make.
 `script.script_pub_key`'s `address`, `addresses` and `type_and_payload`
 are the `address_to_scriptpubkey` direction.
 `create_deterministic_address_bcrt1_p2tr_op_true` composes
@@ -299,7 +300,7 @@ commit  3fd68a95e68b4c6f3bb6c59d41dd196001110f3a  2026-04-07
 behind  0 revisions; that commit is the tip of the path
 ```
 
-Verdict: **covered**. `ecc`'s `ecc/ellswift.py`: `create` for
+Verdict: **covered**. `ecc`'s `ellswift.py`: `create` for
 `ellswift_create`, `encode_var` for `xelligatorswift` and `decode_var`
 for `xswiftec`, over `_xswiftec_var` and `_xswiftec_inv_var`.
 `ellswift_ecdh_xonly` returns the bare x-coordinate of the shared point:
@@ -454,11 +455,12 @@ commit  00d0c5107b92c8972ab106c680579e06fd4fb100  2026-09-09
 behind  0 revisions; that commit is the tip of the path
 ```
 
-Verdict: **covered**. `ecc/dsa.py` and `ecc/ssa.py` sign and verify,
-`ecc/rfc6979_nonce.py` and `ecc/bip340_nonce.py` derive the nonces,
-`key.py` holds the key objects Core's `ECKey` and `ECPubKey` are, and
-`hashes.tagged_hash` is `TaggedHash`. What the signatures are asserted
-against is BIP340's own vectors and the `btclib_secp256k1` bindings.
+Verdict: **covered**. `ecc`'s `dsa.py` and `ssa.py` sign and verify,
+its `rfc6979_nonce.py` and `bip340_nonce.py` derive the nonces, and its
+`hashes.tagged_hash` is `TaggedHash`. btclib's `key.py` holds the key
+objects Core's `ECKey` and `ECPubKey` are. What the signatures are
+asserted against is BIP340's own vectors and the `btclib_secp256k1`
+bindings.
 
 ### `test/functional/test_framework/mempool_util.py`
 
@@ -579,9 +581,9 @@ commit  fe5e495c31de47b0ec732b943db11fe345d874af  2021-03-16
 behind  0 revisions; that commit is the tip of the path
 ```
 
-Verdict: **covered**. `bech32.py` is the codec with no bitcoin in it and
-`b32.py` the bitcoin semantics on top, which is the split this file does
-not make.
+Verdict: **covered**. `base58-bech32`'s `bech32.py` is the codec with no
+bitcoin in it and btclib's `b32.py` the bitcoin semantics on top, which
+is the split this file does not make.
 
 ### `test/functional/test_framework/signet.py`
 
@@ -686,13 +688,11 @@ behind  0 revisions; that commit is the tip of the path
 
 Verdict: **covered in part**. `EncryptedP2PState`'s keys and packets are
 `p2p/bip324.py`'s `Cipher`. Its constructor is `v2_ecdh`
-(`ecc/ellswift.py`'s `xdh`) followed by `initialize_v2_transport`
+(btclib's `ellswift.xdh`) followed by `initialize_v2_transport`
 (`kdf.hkdf_extract` and `kdf.hkdf_expand`). `v2_enc_packet` and
 `v2_receive_packet` are `Cipher.encrypt`, `Cipher.decrypt_length` and
 `Cipher.decrypt`. `SHORTID` and `MSGTYPE_TO_SHORTID` are
-`MESSAGE_IDS`, with `contents_from_message` and `message_from_contents`,
-for the ids both hold. `SHORTID` also holds `feature`, which
-`MESSAGE_IDS` does not: `message_from_contents` raises on its id.
+`MESSAGE_IDS`, with `contents_from_message` and `message_from_contents`.
 
 The handshake is tf2's, and `peer.py`'s `Peer` holds it: the keypair and
 garbage each side sends, sending the garbage terminator and finding the

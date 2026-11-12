@@ -80,7 +80,7 @@ from btclib.script.witness import Witness
 from btclib.tx import OutPoint, Tx, TxIn, TxOut
 from btclib.tx.limits import SEQUENCE_FINAL
 from ecc.curves.curve import secp256k1
-from ecc.ecc.dsa import sign_
+from ecc.dsa import sign_
 
 from btclib_functional_tests.bitcoind import BitcoindAdapter
 from btclib_functional_tests.capability import Capability, require

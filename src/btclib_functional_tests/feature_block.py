@@ -71,8 +71,8 @@ from btclib.script.script_pub_key import ScriptPubKey
 from btclib.script.sig_ops import sig_op_count
 from btclib.tx import OutPoint, Tx, TxIn, TxOut
 from btclib.tx.limits import SEQUENCE_FINAL
-from ecc.ecc.dsa import sign_
-from ecc.ecc.rfc6979_nonce import rfc6979_nonce_
+from ecc.dsa import sign_
+from ecc.rfc6979_nonce import rfc6979_nonce_
 
 __all__ = [
     "BIP34_HEIGHT",

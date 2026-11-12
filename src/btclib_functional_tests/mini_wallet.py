@@ -203,7 +203,7 @@ from btclib.script.taproot import serialize as tapscript_serialize
 from btclib.script.witness import Witness
 from btclib.tx import OutPoint, Tx, TxIn, TxOut
 from btclib.tx.limits import COINBASE_MATURITY
-from ecc.ecc.dsa import sign_
+from ecc.dsa import sign_
 
 if TYPE_CHECKING:
     from btclib_functional_tests.node import NodeAdapter
