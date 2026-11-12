@@ -688,7 +688,7 @@ behind  0 revisions; that commit is the tip of the path
 
 Verdict: **covered in part**. `EncryptedP2PState`'s keys and packets are
 `p2p/bip324.py`'s `Cipher`. Its constructor is `v2_ecdh`
-(`ellswift.py`'s `xdh`) followed by `initialize_v2_transport`
+(btclib's `ellswift.xdh`) followed by `initialize_v2_transport`
 (`kdf.hkdf_extract` and `kdf.hkdf_expand`). `v2_enc_packet` and
 `v2_receive_packet` are `Cipher.encrypt`, `Cipher.decrypt_length` and
 `Cipher.decrypt`. `SHORTID` and `MSGTYPE_TO_SHORTID` are
