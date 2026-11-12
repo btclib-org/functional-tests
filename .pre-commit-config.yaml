@@ -168,10 +168,10 @@ repos:
         name: markdownlint-cli2 (in place fixes)
         args: [--fix]
   # how a link destination is spelled, which markdownlint has no rule for
-  # and the documentation build depends on. Section 4 of the organization
-  # standard is the rule; the same hook in every repository of it
-  # (btclib-org/.github#20), there being no shared hook repository to put
-  # it in
+  # and the documentation build depends on. Section 4 of the
+  # organization's standard is the rule; the same hook in every repository
+  # of the organization (btclib-org/.github#20), there being no shared
+  # hook repository to put it in
   - repo: local
     hooks:
       - id: local-link-prefix
@@ -291,7 +291,7 @@ repos:
         name: a sourcery skip names rules, and no tag
         language: pygrep
         entry: |-
-          #\W*sourcery\W+skip(?!:)|#\W*sourcery\W+skip:[^#]*(?<![\w-])(?:default|refactoring|suggestion|comment)(?![\w-])
+          #\W*sourcery\W+skip\b(?!:[^#;\w]*\w)|#\W*sourcery\W+skip:[^#]*(?<![\w-])(?:default|refactoring|suggestion|comment)(?![\w-])
         types: [python]
   # not the mirrors-mypy hook: it injects --ignore-missing-imports, which
   # turns an unresolved (or misspelled) import into Any, the opposite of
@@ -358,12 +358,12 @@ repos:
   # that dependency, and the one naming a prerelease is what
   # `pinned-rev` above refuses (btclib-org/.github#1199).
   # `language: system` and `uv run --locked` are the form section 4 of the
-  # organization standard gives a local mypy hook, and uv is on the PATH
+  # organization's standard gives a local mypy hook, and uv is on the PATH
   # of every hook because the lint gate is started by it.
   # `--only-group check` adds that group to the environment the gate runs
   # from and takes nothing out of it, and installs no project;
   # `--no-build` makes a dependency with no wheel fail rather than
-  # compile, as section 4 of the organization standard says. The
+  # compile, as section 4 of the organization's standard says. The
   # `-d --min=10 .` and `always_run` are the upstream hook's own
   # definition, written out because a local hook cannot inherit one.
   #

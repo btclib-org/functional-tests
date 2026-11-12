@@ -3,11 +3,11 @@
 What this repository holds in common with the others of the organization
 — the toolchain, the lint gate, the tool tables behind it, the workflow
 set and the branch rules — is stated once in the
-[btclib-org repository standard](https://github.com/btclib-org/.github),
-each rule with the alternative it was decided against. It binds this
+[organization's standard](https://github.com/btclib-org/.github), each
+rule with the alternative it was decided against. It binds this
 repository, so a change departing from it is a divergence, and one filed
-as an issue in that repository rather than here: a difference between two
-repositories belongs to neither of them.
+as an issue in btclib-org/.github rather than here: a difference between
+two repositories belongs to neither of them.
 
 **This file is the same in every repository of the organization up to
 its last section.** What is true of one tree only — the commands that
@@ -62,14 +62,20 @@ review without the model. Text or code you have not read, or cannot
 explain, is closed without review.
 
 **For a pull request the agent opened, whoever approves it reads every
-line and answers for it as their own**, the agent being `claude[bot]`,
-run on an issue by [section 10][s10]'s `reusable-claude-implement.yml`.
-The maintainer, landing it through the bypass without an approval, reads
-every line and answers for it instead, the landing being their own act;
-requiring an approval even where the bypass is kept is the alternative
-set aside. The agent signs off nothing, since a bot cannot certify the
-[Developer Certificate of Origin][dco], so the approval, or that
-landing, is the certification.
+line and answers for it as their own**, the agent being the pull-request
+agent of [`GOVERNANCE.md`][governance]'s *Roles*. The maintainer,
+landing it through the bypass without an approval, reads every line and
+answers for it instead, the landing being their own act; requiring an
+approval even where the bypass is kept is the alternative set aside. The
+agent signs off nothing, since a bot cannot certify the [Developer
+Certificate of Origin][dco], so the approval, or that landing, is the
+certification.
+
+**The `agent` label hands an issue to that agent**, in a repository
+that calls its implement workflow. [Section 11][s11]'s *Labels and issue types*
+says who applies it, [section 10][s10] what the agent does with an issue
+it admits, and the workflow's header which issues it takes, what answers
+a `decision`, and the switch that turns it on.
 
 **Write plainly**, in the tree and on the forge: the point first, plain
 words, one fact per sentence. On the forge, the title and the first
@@ -171,12 +177,11 @@ free to move under a review:
 - the reviewer reopens a thread whose finding is still blocking, and
   re-reviews the delta rather than the branch.
 
-**What ends the loop is the ack of record**, and the author does not
-supply their own. A reading that says what it found and delivers no
-verdict is a review too and ends nothing; [the standard's *Review*][s-rev]
-has which is which, and `REVIEWING.md` has how each is written. A
-disagreement that survives a second exchange goes to the maintainer
-instead of into a third round.
+**What ends the loop is the ack of record.** A reading that says what
+it found and delivers no verdict is a review too and ends nothing; [the
+standard's *Review*][s-rev] has which is which, and `REVIEWING.md` has
+how each is written. A disagreement that survives a second exchange
+goes to the maintainer instead of into a third round.
 
 **The ack of record is not the approval *Landing it* asks for**: it is
 a bot's review of type COMMENT ([the standard's *Review*][s-rev] says
@@ -510,8 +515,8 @@ of it, with the options `test_framework.py` and `test_runner.py` give
 them.
 
 **The interpreter.** `requires-python` is `>=3.12`, by the maintainer's
-own decision departing from section 1 of the organization standard and
-from btclib-org/.github#1324 -- `pyproject.toml`'s own comment on
+own decision departing from section 1 of the organization's standard
+and from btclib-org/.github#1324 -- `pyproject.toml`'s own comment on
 `requires-python` has the measurement, `typing.override` and `sphinx`
 both needing 3.12 and nothing here needing more. `uv run` fetches that
 interpreter on its own where none is on `PATH`, whatever floor is
@@ -681,7 +686,7 @@ itself:
 
 ```shell
 uv run --locked --exact --no-default-groups --group docs \
-    sphinx-build -n -W -b html docs/source docs/build/html
+    sphinx-build -n -W -b html docs/source docs/build/html || exit $?
 if grep -rn 'href="#\.\.\?/' docs/build/html --include='*.html'; then
     echo "::error::the links above resolve to no page (unresolved relative path)"
     exit 1
@@ -700,17 +705,17 @@ rather than at the file's page here. Section 2 of the standard, *The
 documentation*, is the rule:
 
 ```shell
-served=$(mktemp -d)
-git clone --quiet --filter=blob:none --sparse \
-    https://github.com/btclib-org/.github "$served"
-git -C "$served" sparse-checkout set .github/scripts
-git -C "$served" checkout --quiet \
-    "$(sed -n 's/.*reusable-docs\.yml@\([0-9a-f]*\).*/\1/p' .github/workflows/docs.yml)"
 found=0
+pin=$(sed -n 's/.*reusable-docs\.yml@\([0-9a-f]*\).*/\1/p' .github/workflows/docs.yml)
+served=$(mktemp -d) &&
+git clone --quiet --filter=blob:none --sparse \
+    https://github.com/btclib-org/.github "$served" &&
+git -C "$served" sparse-checkout set .github/scripts &&
+git -C "$served" checkout --quiet "$pin" &&
 uv run --no-project --python 3.15 \
     "$served"/.github/scripts/check_included_links.py docs/build/html || found=$?
 rm -rf "$served"
-test "$found" -eq 0
+test "$found" -eq 0 || exit "$found"
 ```
 
 `vendored-vectors.yml`, the `vectors` job re-checks every framework pin
@@ -730,7 +735,7 @@ python .github/scripts/tf2_ledger_census.py \
 `codeql.yml` has no line here: this repository does not carry it yet.
 
 `sourcery.yml` has no line here: section 10 of
-[the organization standard](https://github.com/btclib-org/.github#the-set-and-its-cadence)
+[the organization's standard](https://github.com/btclib-org/.github#the-set-and-its-cadence)
 says why it is a pull request's check and not a local gate.
 
 `node-integration.yml`, the `bitcoind` job -- btclib-org/.github's
@@ -820,8 +825,8 @@ commit pushed is `verified`; [the standard's *Signatures*][s-sigs] has the rule.
 | `vendored-vectors` | weekly | the pins in `TF2.md`, and the census |
 
 Which day each of the rest runs is section 10 of
-[the organization standard](https://github.com/btclib-org/.github), and
-not this file's to restate.
+[the organization's standard](https://github.com/btclib-org/.github),
+and not this file's to restate.
 
 The required checks run on `ubuntu-latest`. The suite, pre-commit, the
 docs build and the integration tests run on the version

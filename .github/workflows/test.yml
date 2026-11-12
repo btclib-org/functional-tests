@@ -5,10 +5,10 @@ name: test
 # beyond the hooks and the documentation build, which lint.yml and
 # docs.yml ask. No `dist` job: `check-wheel-contents` needs the package
 # named at a release this tree does not build (tier 2, section 2 of the
-# organization standard), which is the only packaging check a job here
-# would add. `pyroma` and `check-sdist` are owed regardless -- section
-# 4's condition is a `[build-system]`, not a release -- and the lint
-# gate runs both as local hooks, not a job of this file.
+# organization's standard), which is the only packaging check a job
+# here would add. `pyroma` and `check-sdist` are owed regardless --
+# section 4's condition is a `[build-system]`, not a release -- and the
+# lint gate runs both as local hooks, not a job of this file.
 
 on:
   push:
@@ -31,7 +31,7 @@ jobs:
   # rest of it runs: a pull request that edits only prose changes nothing
   # the jobs below read. The event handling and the decision are
   # btclib-org/.github's, called at a tagged commit (section 10 of
-  # btclib-org/.github's README.md); what stays here is which files are
+  # the organization's standard); what stays here is which files are
   # this tree's own prose
   changes:
     name: Decide whether the jobs below have anything to check
@@ -71,10 +71,10 @@ jobs:
   test-passed:
     name: "test: every job passed"
     # nothing in this tree calls this workflow -- no release.yml exists
-    # (tier 2, section 2 of the organization standard) and this file
-    # declares no workflow_call: trigger -- so section 10 of the
-    # organization standard's "The aggregate job, and the required check"
-    # is what decides the shape: the listing, asked of the API, rather
+    # (tier 2, section 2 of the organization's standard) and this file
+    # declares no workflow_call: trigger -- so section 10's "The aggregate
+    # job, and the required check", in the organization's standard, is
+    # what decides the shape: the listing, asked of the API, rather
     # than needs.*.result, which twice reported a red matrix as success
     # under a codeload outage that killed a cell before it reached the
     # needs context at all (btclib-benchmarks' test.yml carries the same
@@ -115,7 +115,7 @@ jobs:
       # the script is btclib-org/.github's, served from there at main under a
       # `path:` of its own and sparse on .github/scripts, so no copy of it is
       # kept in this tree: the wait and the verdict are tested where it lives
-      # (section 10 of that repository's README.md)
+      # (section 10 of the organization's standard)
       - name: Check out the check script
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -127,12 +127,13 @@ jobs:
       # a row of this job's own needs that the listing still shows
       # unfinished is the listing lagging and not the run, and the script
       # accepts it where that job's own result is success or skipped
-      # (btclib-org/.github#1395), matched as section 10 of the organization
-      # standard says: `changes` calls a reusable workflow, so its rows list
-      # under its own `name:` followed by a space, a slash and a space, and
-      # `coverage` lists under its own `name:` exactly. Each is a second copy
-      # of the job's own name, which a rename leaves matching nothing --
-      # refusing a lagging row again rather than accepting any other
+      # (btclib-org/.github#1395), matched as section 10 of the
+      # organization's standard says: `changes` calls a reusable workflow, so
+      # its rows list under its own `name:` followed by a space, a slash and
+      # a space, and `coverage` lists under its own `name:` exactly. Each is
+      # a second copy of the job's own name, which a rename leaves matching
+      # nothing -- refusing a lagging row again rather than accepting any
+      # other
       - name: Fail unless every other job of this run succeeded
         env:
           GH_TOKEN: ${{ github.token }}

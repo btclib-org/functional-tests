@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import runpy
 import subprocess
 import sys
 from collections.abc import Callable
@@ -665,3 +666,13 @@ def test_a_server_error_that_persists_is_raised_after_the_last_attempt(
         call(census)
 
     assert len(calls) == 3
+
+
+def test_the_script_exits_with_main_s_own_status(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Run as the workflow step runs it, the exit status is `main`'s."""
+    monkeypatch.setattr(sys, "argv", [str(_SCRIPT)])
+    with pytest.raises(SystemExit) as excinfo:
+        runpy.run_path(str(_SCRIPT), run_name="__main__")
+    assert excinfo.value.code == 2

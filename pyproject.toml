@@ -110,8 +110,8 @@ check = [
     # falls back to an isolated one that resolves [build-system]'s
     # requires from an index. This is that requirement's uv_build, and
     # .pre-commit-config.yaml's own pyroma hook is what section 12 of
-    # the organization standard asks for: a hook building the project
-    # uses a backend [build-system] admits
+    # the organization's standard asks for: a hook building the
+    # project uses a backend [build-system] admits
     "uv_build>=0.12.0,<0.14",
 ]
 docs = [
@@ -177,7 +177,7 @@ xfail_strict = true
 # What one test is given, setup and teardown included, before
 # pytest-timeout fails it by name: a hang on a node's process, socket or
 # RPC otherwise runs on until the workflow's own `timeout-minutes` ends
-# the job with no test named (section 7 of the organization standard).
+# the job with no test named (section 7 of the organization's standard).
 # Measured on 2026-11-07 against the bitcoind release
 # `node-integration.yml` pins and the released btclib-node at once, on a
 # machine other sessions were loading:
@@ -255,7 +255,10 @@ extend-glob = ["CHANGELOG.md", ".pre-commit-config.yaml", "TF2.md"]
 extend-ignore-re = ['`[^`]*`']
 
 [tool.coverage.run]
-source = ["btclib_functional_tests", "tests"]
+# .github/scripts is not an importable package: coverage measures it by
+# path, so a branch of a workflow's script that no test reaches fails
+# the floor as one of the package's would
+source = ["btclib_functional_tests", "tests", ".github/scripts"]
 # tests/integration is omitted because the ratchet measures what an
 # ordinary run executes, and those tests skip themselves without
 # TF2_INTEGRATION: their bodies would be uncovered lines of tests/ at
@@ -423,7 +426,7 @@ parametrize-names-type = "csv"
 # COPYRIGHT transcribed: each line with its regex metacharacters
 # escaped, joined by a literal \n, and `^(#![^\n]*\n)?` ahead of it for
 # the shebang a `language: script` hook's file opens with -- section 5
-# of the organization standard, and btclib-org/.github#1294, which is
+# of the organization's standard, and btclib-org/.github#1294, which is
 # where the shebang tolerance landed
 notice-rgx = "^(#![^\\n]*\\n)?# Copyright \\(c\\) The btclib developers\\n# Distributed under the MIT software license, see the accompanying\\n# LICENSE file or https://opensource\\.org/license/mit for the full text\\."
 

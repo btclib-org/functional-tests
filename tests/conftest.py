@@ -7,9 +7,9 @@
 The gate is `coverage_fail_under` and the guard on it. coverage looks
 for its configuration in the directory the process started in, so a run
 started from `tests/` finds no `fail_under`, no `source` and no
-`branch = true`. Section 8 of the organization standard leaves a tree to
-point such a run at its configuration or to make it say it is ungated,
-and this file is the second of the two: such a run is refused
+`branch = true`. Section 8 of the organization's standard leaves a tree
+to point such a run at its configuration or to make it say it is
+ungated, and this file is the second of the two: such a run is refused
 (btclib-org/.github#443).
 
 `stop_all`, `stash_or_report`, `fold_worker_tally` and `AdapterFactory`
@@ -82,13 +82,10 @@ def asks_for_everything(
     :param rootpath: the pytest rootdir.
     :returns: whether the run collects the whole suite.
     """
-    given = [Path(path).resolve() for path in file_or_dir or []]
-    if not given:
+    if not (given := [Path(path).resolve() for path in file_or_dir or []]):
         return True
     wanted = [(rootpath / path).resolve() for path in testpaths]
-    if not wanted:
-        return False
-    return all(
+    return bool(wanted) and all(
         any(target == path or path in target.parents for path in given)
         for target in wanted
     )
@@ -151,10 +148,11 @@ def coverage_configuration(config: pytest.Config) -> CoverageConfiguration | Non
     """
     plugin = config.pluginmanager.getplugin("_cov")
     controller = getattr(plugin, "cov_controller", None)
-    if controller is None:
-        return None
-    measuring: CoverageConfiguration = controller.cov.config
-    return measuring
+    return (
+        None
+        if controller is None
+        else cast("CoverageConfiguration", controller.cov.config)
+    )
 
 
 def configuration_went_unread(

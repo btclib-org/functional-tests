@@ -356,9 +356,7 @@ def _reserved_option_names(command: Sequence[str]) -> frozenset[str]:
     reserved = frozenset(
         _canonical_option_name(name) for name in names if name is not None
     )
-    if reserved & _CHAIN_SELECTORS:
-        return reserved | _CHAIN_SELECTORS
-    return reserved
+    return reserved | _CHAIN_SELECTORS if reserved & _CHAIN_SELECTORS else reserved
 
 
 def _check_extra_args(command: Sequence[str], extra_args: Sequence[str]) -> None:
@@ -659,9 +657,7 @@ class NodeAdapter(ABC):
         This adapter's own `_ThreadSessions`, wrapped in `traced_transport`
         where `trace_rpc` is set.
         """
-        if self._trace_rpc:
-            return traced_transport(self._sessions)
-        return self._sessions
+        return traced_transport(self._sessions) if self._trace_rpc else self._sessions
 
     def _log_path(self) -> Path | None:
         """Return the file this node logs to, or `None` where none is known.

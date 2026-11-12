@@ -375,21 +375,22 @@ def _latest_commit(repo: str, path: str, sha: str) -> tuple[str, str] | None:
         characters, or None where no commit in that history touches the
         path.
     """
-    commits = json.loads(
-        _gh_output(
-            "api",
-            "--method",
-            "GET",
-            f"repos/{repo}/commits",
-            "-f",
-            f"path={path}",
-            "-f",
-            f"sha={sha}",
-            "-f",
-            "per_page=1",
+    if not (
+        commits := json.loads(
+            _gh_output(
+                "api",
+                "--method",
+                "GET",
+                f"repos/{repo}/commits",
+                "-f",
+                f"path={path}",
+                "-f",
+                f"sha={sha}",
+                "-f",
+                "per_page=1",
+            )
         )
-    )
-    if not commits:
+    ):
         return None
     return commits[0]["sha"], commits[0]["commit"]["committer"]["date"][:10]
 

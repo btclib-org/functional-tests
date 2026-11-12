@@ -266,9 +266,7 @@ class Socks5Proxy:
         Core's own `unix:` prefix (`IsUnixSocketPath`, `src/netbase.cpp`).
         """
         address = self.address
-        if isinstance(address, str):
-            return f"unix:{address}"
-        return _spell(address)
+        return f"unix:{address}" if isinstance(address, str) else _spell(address)
 
     def next_request(self) -> Socks5Request:
         """Return the oldest request not yet returned.
@@ -454,8 +452,7 @@ def _forward(near: socket.socket, far: socket.socket) -> None:
         while True:
             readable, _, _ = select.select(ends, (), ())
             for end in readable:
-                data = end.recv(_CHUNK)
-                if not data:
+                if not (data := end.recv(_CHUNK)):
                     return
                 (far if end is near else near).sendall(data)
     except ConnectionError:

@@ -16,10 +16,11 @@ name: node-integration
 # ISS 8's decision below keeps bitcoind's pinned release the only
 # required check.
 #
-# No `schedule:`: section 10 of the organization standard's own record,
-# *Which trees carry which sentinel*, does not name this repository
-# against the `integration-bitcoind` row, so a cron here would be a row
-# the calendar gives nobody, exactly the finding `tests/grid_test.py`'s
+# No `schedule:`: the record section 10 of the organization's standard
+# keeps, *Which trees carry which sentinel*, does not name this
+# repository against the `integration-bitcoind` row, so a cron here
+# would be a row the calendar gives nobody, exactly the finding
+# `tests/grid_test.py`'s
 # `test_every_row_of_the_calendar_names_something_that_exists` is for.
 # Every trigger below is a gate's rather than a sentinel's, so
 # `tests/grid_test.py::schedules` never sees this file at all: an
@@ -44,7 +45,7 @@ name: node-integration
 # `.github/scripts/install_bitcoind.py`, the script
 # `reusable-integration-bitcoind.yml` runs for `bitcoind`, from a sparse
 # checkout of that repository at `main` beside this tree: a tree's own
-# job reads `main`, as section 10 of btclib-org/.github's README.md says.
+# job reads `main`, as section 10 of the organization's standard says.
 #
 # `core-master` and `btclib-node-main` are ISS 8's decision of
 # 2026-09-25: the pinned release stays the only required check -- a
@@ -64,10 +65,10 @@ name: node-integration
 # `bitcoind` and `btclib-node` against it, and a job built from
 # Bitcoin Core's own `master` would fail a pull request for a reason the
 # diff never touched. Push to `main` and `workflow_dispatch` are what the
-# issue asks for; a `schedule:` is not -- section 10 of the organization
-# standard's own calendar does not name this repository against either
-# job, so a cron here would be a row the calendar gives nobody, the
-# finding `tests/grid_test.py::schedules` exists for, exactly as the
+# issue asks for; a `schedule:` is not -- the calendar of section 10 of
+# the organization's standard does not name this repository against
+# either job, so a cron here would be a row the calendar gives nobody,
+# the finding `tests/grid_test.py::schedules` exists for, exactly as the
 # header above already argues for `bitcoind` and `btclib-node`.
 #
 # `older-core` is ISS 434's: the releases v29.4 and v30.3, informational
