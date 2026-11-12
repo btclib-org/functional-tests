@@ -702,8 +702,7 @@ class BitcoindAdapter(NodeAdapter):
         `-rpcservertimeout` seconds, 30 by default
         (`DEFAULT_HTTP_SERVER_TIMEOUT`, `src/httpserver.h`,
         bitcoin/bitcoin@f0de87f040; measured against the release
-        `node-integration.yml` pins, a kept connection still open after 25
-        seconds idle and closed by 35), while `NodeAdapter` keeps its
+        `node-integration.yml` pins), while `NodeAdapter` keeps its
         connections open across calls (`_ThreadSessions`, `node.py`).
         `SessionTransport` probes a kept connection before reusing it and
         does not retry a bare `ConnectionResetError` its read raises, so a

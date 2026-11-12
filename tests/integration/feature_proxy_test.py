@@ -74,8 +74,7 @@ Each node given a proxy is also started with `-dnsseed` off, as Core's
 own `write_config` (`test_framework/util.py`) starts every node: through
 a proxy, a regtest node asks for its chain's own `dummySeed.invalid.` as
 well, and that request can reach the proxy ahead of one of the test's
-own (measured against the release `node-integration.yml` pins, the
-request reaching the proxy within a second of the start).
+own (measured against the release `node-integration.yml` pins).
 
 Each `feature_proxy_<node>_test.py` module beside this one runs it,
 `tests/integration/conftest.py`'s own module docstring having how.
