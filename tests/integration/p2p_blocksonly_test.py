@@ -4,8 +4,8 @@
 
 """Core's `p2p_blocksonly`, as bodies over each node.
 
-Read from Core's `test/functional/p2p_blocksonly.py` (`278710a88d8f`,
-2026-06-17): a peer a node takes no transactions from is dropped for
+Read from Core's `test/functional/p2p_blocksonly.py` (`22535b460568`,
+2026-10-13): a peer a node takes no transactions from is dropped for
 sending or announcing one. Each of Core's two checks is a wire half and a
 log half (`Capability.DEBUG_LOG`), each body over a fresh node:
 
@@ -22,9 +22,10 @@ log half (`Capability.DEBUG_LOG`), each body over a fresh node:
   (`Capability.TYPED_OUTBOUND`) sending a `tx` or announcing one in an
   `inv`, answers a block-relay-only peer's `getdata` for a transaction
   with nothing, not even a `notfound`, and announces a transaction
-  submitted over RPC to no block-relay-only peer once its clock
-  (`Capability.CLOCK`) has moved on a minute, as Core's does. The log
-  half asserts the two violation lines.
+  submitted over RPC to an outbound full-relay peer and to no
+  block-relay-only peer once its clock (`Capability.CLOCK`) has moved on
+  a minute, as Core's does. The log half asserts the two violation
+  lines.
 
 Every body mines a coin to spend first (`Capability.MINE`,
 `mini_wallet.MiniWallet`).
@@ -43,11 +44,6 @@ What differs from Core's file besides:
   `-noblocksonly` after mining the relayed transaction; here the second
   check starts a fresh node, whose default is to relay transactions, and
   the first mines nothing after its relay;
-- Core's check that a block-relay-only peer is announced nothing looks
-  for the transaction's txid alone, where a node announces by wtxid to a
-  peer that sent `wtxidrelay`, as that one did, so it passes whether the
-  node announces the transaction or not; this one looks for its wtxid
-  too;
 - every block-relay-only peer listens on a port the OS chooses
   (`peer.Listener`), where Core's reuses one `p2p_idx`.
 
@@ -284,13 +280,16 @@ def _block_relay_conn(
         assert _peer_info(node)[0]["relaytxes"] is False
         assert "notfound" not in conn.peer.last_message
 
-        # a transaction submitted over RPC is announced to no such peer
+        # a transaction submitted over RPC is announced to a full-relay
+        # peer and to no block-relay-only one
         conn = RelayConn.outbound(stack, node, connection_type="block-relay-only")
+        tx_relay_peer = RelayConn.outbound(stack, node)
         node.rpc.call("sendrawtransaction", [tx.serialize(True).hex()])
         # Core's own minute, for an announcement timer to have fired
         node.set_mock_time(int(time.time()) + 60)
+        tx_relay_peer.sync_with_ping()
         conn.sync_with_ping()
-        assert tx.id not in conn.tx_invs
+        assert tx.hash in tx_relay_peer.tx_invs
         assert tx.hash not in conn.tx_invs
 
 
