@@ -1037,7 +1037,7 @@ gh api --method GET repos/bitcoin/bitcoin/commits \
 | `p2p_i2p_sessions.py` | [`fa5f29774872`](https://github.com/bitcoin/bitcoin/commit/fa5f29774872) | 2025-12-16 | pass, the session lines' wording asserted per-build ([ISS 354](https://github.com/btclib-org/functional-tests/issues/354)) | skip (i2p_sam) |
 | `p2p_dns_seeds.py` | [`fa4cb96bdec2`](https://github.com/bitcoin/bitcoin/commit/fa4cb96bdec2) | 2026-02-17 | pass | skip (dns_seed) |
 | `p2p_seednode.py` | [`fa5f29774872`](https://github.com/bitcoin/bitcoin/commit/fa5f29774872) | 2025-12-16 | pass | skip (address_fetch) |
-| `p2p_ibd_stalling.py` (wire) | [`24628d3ae7dc`](https://github.com/bitcoin/bitcoin/commit/24628d3ae7dc) | 2026-09-14 | pass | fail ([ISS btclib-node#2416](https://github.com/btclib-org/btclib-node/issues/2416)) |
+| `p2p_ibd_stalling.py` (wire) | [`24628d3ae7dc`](https://github.com/bitcoin/bitcoin/commit/24628d3ae7dc) | 2026-09-14 | pass | flaky ([ISS btclib-node#2416](https://github.com/btclib-org/btclib-node/issues/2416)) on the build; pass on a build past [ISS btclib-node#2416](https://github.com/btclib-org/btclib-node/issues/2416) |
 | `p2p_ibd_stalling.py` (log) | same | same | pass, `Stall started`'s absence once the block withheld first is sent asserted per-build ([ISS 354](https://github.com/btclib-org/functional-tests/issues/354)) | skip (debug_log) |
 | `p2p_ibd_stalling.py` (`manual`, wire) | same | same | pass, `manual` asserted per-build ([ISS 35](https://github.com/btclib-org/functional-tests/issues/35)) | pass |
 | `p2p_ibd_stalling.py` (`manual`, log) | same | same | pass, `manual` asserted per-build ([ISS 35](https://github.com/btclib-org/functional-tests/issues/35)) | skip (debug_log) |
@@ -1316,9 +1316,10 @@ no entry here is a `bitcoind only` row, or has its reason in the docstring of
   `P2PInterface`.
 - `rpc_orphans.py`: Core's claim in full.
 - `p2p_ibd_stalling.py`: the log rows skip on `debug_log`. The (wire) row
-  fails: once the stalling peer sees its connection close, `getpeerinfo`
-  still lists it
-  ([ISS btclib-node#2416](https://github.com/btclib-org/btclib-node/issues/2416)).
+  is flaky on a build whose `getpeerinfo` can still list the stalling peer
+  once that peer sees its connection close. A build past
+  [ISS btclib-node#2416](https://github.com/btclib-org/btclib-node/issues/2416)
+  passes.
 - `p2p_tx_privacy.py`: a `Peer` sends `version` and `wtxidrelay` by hand
   and holds back its `verack`.
 - `mempool_package_rbf.py`: the mempool-ancestor body alone restarts with
