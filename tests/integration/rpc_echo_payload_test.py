@@ -140,7 +140,7 @@ def a_payload_is_answered_or_refused_never_left_to_time_out(
     require(Capability.RPC_WORK_QUEUE, node.capabilities, skip_counts)
     node.restart(["-rpcworkqueue=2", "-rpcthreads=2"])
     # json-serializable, but not hex
-    data = "z" + random.randbytes(1_999_000).hex()
+    data = f"z{random.randbytes(1_999_000).hex()}"
     per_call = serves_through_libevent(node)
     with ThreadPoolExecutor(max_workers=_CALLERS) as callers:
         futures = [

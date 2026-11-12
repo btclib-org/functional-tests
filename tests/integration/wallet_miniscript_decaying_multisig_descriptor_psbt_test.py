@@ -182,7 +182,7 @@ def a_decaying_multisig_spends_with_fewer_signers_past_each_lock(
         if m < n:
             # the time-locked transaction is too immature to spend with
             # m-of-n at this height
-            assert (current_height >= locktime) is False
+            assert current_height < locktime
             refused(
                 multisig,
                 "sendrawtransaction",
