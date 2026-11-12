@@ -730,8 +730,9 @@ class SkipCounts:
 
     def report(self) -> str:
         """Return one line per capability recorded, or say that none was."""
-        lines = [f"{capability.value}: {count}" for capability, count in self]
-        if not lines:
+        if not (
+            lines := [f"{capability.value}: {count}" for capability, count in self]
+        ):
             return "skips per capability: no test asked for one this run"
         return "skips per capability:\n" + "\n".join(lines)
 

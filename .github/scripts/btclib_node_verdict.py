@@ -1088,9 +1088,7 @@ def _outcome(statuses: list[str]) -> str:
     """Return a row's outcome from its testcases' own statuses."""
     if "fail" in statuses:
         return "fail"
-    if "skip" in statuses:
-        return "skip"
-    return "pass"
+    return "skip" if "skip" in statuses else "pass"
 
 
 _KIND = {

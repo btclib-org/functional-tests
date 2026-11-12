@@ -87,8 +87,7 @@ class _Wire:
             try:
                 message = Message.parse(stream)
             except Exception:
-                chunk = self._connection.recv(4096)
-                if not chunk:
+                if not (chunk := self._connection.recv(4096)):
                     raise
                 self._buffer += chunk
             else:
