@@ -105,9 +105,7 @@ def wrapped(nsigs: int, keys: Sequence[str], output_type: str) -> str:
     multi = f"multi({nsigs},{','.join(keys)})"
     if output_type == "legacy":
         return f"sh({multi})"
-    if output_type == "p2sh-segwit":
-        return f"sh(wsh({multi}))"
-    return f"wsh({multi})"
+    return f"sh(wsh({multi}))" if output_type == "p2sh-segwit" else f"wsh({multi})"
 
 
 def multisig_script(nsigs: int, keys: Sequence[str]) -> bytes:
@@ -226,7 +224,7 @@ def _combinerawtransaction_refusals(
     """
     combine = "combinerawtransaction"
     _refused(
-        node, combine, [[rawtx2, rawtx3 + "00"]], _DESERIALIZATION, "TX decode failed"
+        node, combine, [[rawtx2, f"{rawtx3}00"]], _DESERIALIZATION, "TX decode failed"
     )
     if not checks_mergeability:
         with pytest.raises(RpcError) as refusal:
