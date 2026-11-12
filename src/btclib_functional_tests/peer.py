@@ -247,8 +247,7 @@ class Peer:
 
         :raises ConnectionError: the node closed the connection.
         """
-        chunk = self._socket.recv(4096)
-        if not chunk:
+        if not (chunk := self._socket.recv(4096)):
             err_msg = "connection closed while waiting for a message"
             raise ConnectionError(err_msg)
         self._buffer += chunk
