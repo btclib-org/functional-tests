@@ -28,7 +28,7 @@ from btclib.script.script import serialize as script_serialize
 from btclib.tx import OutPoint, Tx, TxIn, TxOut
 from btclib.tx.limits import COINBASE_MATURITY
 from ecc.curves.curve import secp256k1
-from ecc.ecc.dsa import verify_
+from ecc.dsa import verify_
 
 from btclib_functional_tests.capability import Capability
 from btclib_functional_tests.mini_wallet import (

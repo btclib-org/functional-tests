@@ -42,9 +42,9 @@ dependencies = [
     # btclib-org/btclib#2220, rule 1). `peer.py` imports
     # `btclib.p2p.bip324`, which needs `cryptography`, which btclib's
     # `bip324` extra installs
-    "btclib[bip324]>=2026.10.24",
-    "ecc>=2026.10.23",
-    "bip32-descriptors>=2026.10.31",
+    "btclib[bip324]>=2026.11.10",
+    "ecc>=2026.11.8",
+    "bip32-descriptors>=2026.11.11",
     "bitcoin-core-rpc>=2026.9.24",
 ]
 keywords = [

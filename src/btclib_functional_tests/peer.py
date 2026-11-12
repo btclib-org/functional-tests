@@ -26,7 +26,7 @@ transport, Core's `supports_v2_p2p`. The handshake is Core's
 `EncryptedP2PState` (`test/functional/test_framework/v2_p2p.py`), the
 dialling side as the initiator and the accepting side as the responder.
 Its ciphers, its key schedule and its packets are
-`btclib.p2p.bip324`'s, its key exchange `btclib.ecc.ellswift`'s.
+`btclib.p2p.bip324`'s, its key exchange `btclib.ellswift`'s.
 """
 
 from __future__ import annotations
@@ -39,7 +39,7 @@ import time
 from collections import Counter
 from typing import TYPE_CHECKING, Self
 
-from btclib.ecc.ellswift import ELL_SIZE
+from btclib.ellswift import ELL_SIZE
 from btclib.exceptions import BTClibValueError, IncompleteMessageError
 from btclib.p2p import (
     Message,
@@ -61,7 +61,7 @@ from btclib.p2p.bip324 import (
     message_from_contents,
 )
 from ecc.curves import secp256k1
-from ecc.ecc.ellswift import create
+from ecc.ellswift import create
 
 from btclib_functional_tests.timeout_factor import scaled
 
