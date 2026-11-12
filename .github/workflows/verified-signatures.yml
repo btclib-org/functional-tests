@@ -45,7 +45,7 @@ jobs:
   # the job itself is btclib-org/.github's, called at a tagged commit
   # (section 10 of the organization's standard)
   verified-signatures:
-    uses: btclib-org/.github/.github/workflows/reusable-verified-signatures.yml@5be4b0fbb5231cff001a3ee0eaa8f7d82bffef11 # v2026.11.5
+    uses: btclib-org/.github/.github/workflows/reusable-verified-signatures.yml@cb5a79443399980ba717df2dea23dbedf6bdbc3a # v2026.11.12
     with:
       before: ${{ inputs.before }}
       after: ${{ inputs.after }}
