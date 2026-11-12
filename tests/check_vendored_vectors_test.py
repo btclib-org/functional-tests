@@ -68,13 +68,15 @@ class FakeGh:
 
     `commits` maps a path to the (sha, date) the listing names first; a
     path absent from it answers with an empty list. `issues` holds the
-    numbers of the open issues `gh issue list` answers with. Every call
-    is recorded in `calls`.
+    numbers of the open issues titled as searched. `longer_titles` maps
+    the number of each other issue the search finds to its title, listed
+    first. Every call is recorded in `calls`.
     """
 
     def __init__(self) -> None:
         self.commits: dict[str, tuple[str, str]] = {}
         self.issues: list[int] = []
+        self.longer_titles: dict[int, str] = {}
         self.calls: list[list[str]] = []
 
     def __call__(
@@ -82,9 +84,17 @@ class FakeGh:
     ) -> subprocess.CompletedProcess[str]:
         """Record the call, and answer the path or the issues it asked about."""
         self.calls.append(list(argv))
-        if argv[1] == "issue":
-            issues = [{"number": number} for number in self.issues]
+        if argv[1:3] == ["issue", "list"]:
+            search = argv[argv.index("--search") + 1]
+            title = search.removeprefix('"').removesuffix('" in:title')
+            issues = [
+                {"number": number, "title": longer}
+                for number, longer in self.longer_titles.items()
+            ]
+            issues.extend({"number": number, "title": title} for number in self.issues)
             return subprocess.CompletedProcess(argv, 0, stdout=json.dumps(issues))
+        if argv[1] == "issue":
+            return subprocess.CompletedProcess(argv, 0, stdout="")
         path = next(a.removeprefix("path=") for a in argv if a.startswith("path="))
         found = self.commits.get(path)
         commits = (
@@ -383,6 +393,20 @@ def test_report_closes_the_issue_once_no_pin_drifts(
     checker.report(tmp_path / "TF2.md", "a title", [], [])
     [close] = _issue_calls(fake_gh, "close")
     assert close[:2] == ["close", "42"]
+
+
+def test_open_issue_number_skips_a_longer_title_holding_the_one_searched(
+    checker: ModuleType, fake_gh: FakeGh
+) -> None:
+    """An issue the search finds under a longer title is not this one.
+
+    It is listed first, ahead of the exact title where there is one
+    (issue btclib-org/.github#2152).
+    """
+    fake_gh.longer_titles = {41: "Two pins behind upstream, in TF2.md"}
+    assert checker._open_issue_number("Pins behind upstream") is None
+    fake_gh.issues = [42]
+    assert checker._open_issue_number("Pins behind upstream") == "42"
 
 
 def test_report_does_nothing_with_no_drift_and_no_issue(
