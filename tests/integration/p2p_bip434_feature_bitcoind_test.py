@@ -68,10 +68,14 @@ _MAGIC = magic_from_chain("regtest")
 _SERVICES = ServiceFlags.NODE_NETWORK | ServiceFlags.NODE_WITNESS
 _USER_AGENT = b"/btclib-functional-tests:0/"
 
-# node/protocol_version.h, read at Core's `master`: the protocol version
-# BIP434's FEATURE message needs, and one no release before `v32.0`
-# reaches (module docstring above).
+# Core's `FEATURE_VERSION` (`src/node/protocol_version.h`,
+# bitcoin/bitcoin@f0de87f040): the protocol version BIP434's FEATURE
+# message needs, and one no release before `v32.0` reaches (module
+# docstring above). The version below it is what a pre-feature peer
+# offers, Core's `WTXID_RELAY_VERSION`, so the `wtxidrelay` that peer
+# sends is one Core honours.
 _FEATURE_VERSION = 70017
+_PRE_FEATURE_VERSION = _FEATURE_VERSION - 1
 
 
 def _protocol_version(bitcoind_adapter: BitcoindAdapter) -> int:
@@ -134,17 +138,24 @@ def test_feature_after_verack(bitcoind_adapter: BitcoindAdapter) -> None:
 def test_feature_before_verack_from_a_pre_feature_peer(
     bitcoind_adapter: BitcoindAdapter,
 ) -> None:
-    """A peer offering below `_FEATURE_VERSION`, sending `FEATURE` early.
+    """A peer offering `_PRE_FEATURE_VERSION`, sending `FEATURE` early.
 
-    `Version`'s own default (`btclib.p2p`) is below `_FEATURE_VERSION`,
-    so this peer's own handshake already puts it where
+    The version is explicit because `Version`'s default is btclib's
+    `limits.PROTOCOL_VERSION`, which follows Core's. It puts this peer where
     `net_processing.cpp`'s own `GetCommonVersion() < FEATURE_VERSION`
     check fires on a build that has it -- reached only ahead of `verack`,
     which this peer completes only where the node is not expected to
     have disconnected it first.
     """
     with Peer(bitcoind_adapter.p2p_address, _MAGIC) as peer:
-        peer.send(Version(services=_SERVICES, user_agent=_USER_AGENT, nonce=1))
+        peer.send(
+            Version(
+                version=_PRE_FEATURE_VERSION,
+                services=_SERVICES,
+                user_agent=_USER_AGENT,
+                nonce=1,
+            ),
+        )
         peer.wait_for("version")
         peer.send(Feature(b"abcd", b""))
         if _protocol_version(bitcoind_adapter) >= _FEATURE_VERSION:
