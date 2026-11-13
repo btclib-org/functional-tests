@@ -751,9 +751,9 @@ repository's adapter reaches.
 A verdict is **pass**; **fail**, naming the issue a disagreement is
 filed as on `btclib-node`'s own tracker (rule 3); or **skip**, naming
 the capability ([`capability.py`](./src/btclib_functional_tests/capability.py))
-the node does not declare; or **not ported**, where the node declares
-every capability the row asks for and the test run against it is still
-a stub ending in `pytest.fail`
+the node, or the wallet factory, does not declare; or **not ported**,
+where every capability the row asks for is declared and the test run
+against it is still a stub ending in `pytest.fail`
 ([ISS 82](https://github.com/btclib-org/functional-tests/issues/82));
 or **flaky**, naming the issue its race is filed as, where one build
 passes the test on some runs and fails it on others, so that either
@@ -1030,6 +1030,7 @@ gh api --method GET repos/bitcoin/bitcoin/commits \
 | `wallet_miniscript_decaying_multisig_descriptor_psbt.py` | [`88f802983571`](https://github.com/bitcoin/bitcoin/commit/88f802983571) | 2026-01-31 | pass | skip (node_wallet) |
 | `wallet_anchor.py` | [`609d265ebc51`](https://github.com/bitcoin/bitcoin/commit/609d265ebc51) | 2025-09-03 | pass | skip (node_wallet) |
 | `wallet_disable.py` | [`3fd68a95e68b`](https://github.com/bitcoin/bitcoin/commit/3fd68a95e68b) | 2026-04-07 | pass | bitcoind only |
+| `wallet_balance.py` | [`fa6f7e36a8c2`](https://github.com/bitcoin/bitcoin/commit/fa6f7e36a8c2) | 2026-10-23 | pass | skip (node_wallet) |
 | `mempool_accept_wtxid.py` | [`fa704c5d3caf`](https://github.com/bitcoin/bitcoin/commit/fa704c5d3caf) | 2026-10-23 | pass | pass |
 | `rpc_orphans.py` | [`fa5f29774872`](https://github.com/bitcoin/bitcoin/commit/fa5f29774872) | 2025-12-16 | pass | pass |
 | `mining_template_verification.py` | [`6eca11175be6`](https://github.com/bitcoin/bitcoin/commit/6eca11175be6) | 2026-07-16 | pass | pass |

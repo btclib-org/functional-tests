@@ -198,9 +198,7 @@ released `2026.9.24` and at `main`
 no wallet, `src/btclib_node/rpc/callbacks.py`'s own dispatch table naming
 no wallet RPC -- no `createwallet`, `getnewaddress` or `signmessage` --
 measured at the released `2026.9.24` and at `main` (`d2b4efa5`) alike. A
-wallet kept beside the node is
-[ISS 199](https://github.com/btclib-org/functional-tests/issues/199)'s
-to reach.
+wallet kept beside the node is `wallet.WalletAdapter`'s to reach.
 
 `Capability.TX_RECONCILIATION` and `Capability.PEER_BLOOM_FILTERS` are
 never declared either: `cli.py` registers neither `-txreconciliation` nor

@@ -11,6 +11,13 @@ btclib\_functional\_tests.bitcoind module
    :members:
    :show-inheritance:
 
+btclib\_functional\_tests.bitcoind\_wallet module
+-------------------------------------------------
+
+.. automodule:: btclib_functional_tests.bitcoind_wallet
+   :members:
+   :show-inheritance:
+
 btclib\_functional\_tests.btcd module
 -------------------------------------
 
@@ -85,6 +92,13 @@ btclib\_functional\_tests.timeout\_factor module
 ------------------------------------------------
 
 .. automodule:: btclib_functional_tests.timeout_factor
+   :members:
+   :show-inheritance:
+
+btclib\_functional\_tests.wallet module
+---------------------------------------
+
+.. automodule:: btclib_functional_tests.wallet
    :members:
    :show-inheritance:
 

@@ -739,6 +739,7 @@ _ROWS: dict[str, str] = {
         "`wallet_miniscript_decaying_multisig_descriptor_psbt.py`"
     ),
     "wallet_anchor": "`wallet_anchor.py`",
+    "wallet_balance": "`wallet_balance.py`",
     "feature_startupnotify": "`feature_startupnotify.py`",
     "rpc_dumptxoutset": "`rpc_dumptxoutset.py`",
     "feature_loadblock": "`feature_loadblock.py`",

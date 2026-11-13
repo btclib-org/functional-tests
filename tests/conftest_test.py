@@ -840,7 +840,7 @@ def test_fold_worker_tally_adds_a_present_worker_s_tally() -> None:
     """A worker's own stashed mapping is folded into the running tally."""
     counts = SkipCounts()
     fold_worker_tally(counts, {"skip_counts": {"mine": 2, "connect": 1}})
-    assert list(counts) == [(Capability.CONNECT, 1), (Capability.MINE, 2)]
+    assert list(counts) == [("connect", 1), ("mine", 2)]
 
 
 def test_fold_worker_tally_defaults_to_no_counts_without_the_key() -> None:

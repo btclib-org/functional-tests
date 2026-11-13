@@ -2,7 +2,7 @@
 # Distributed under the MIT software license, see the accompanying
 # LICENSE file or https://opensource.org/license/mit for the full text.
 
-"""What a node can do, and how many tests skipped for lack of it.
+"""What a node or a wallet can do, and how many tests skipped for lack of it.
 
 Rule 4 of [ISS 2220](https://github.com/btclib-org/btclib/issues/2220): a
 node declares its capabilities, a test needing one the node lacks skips,
@@ -11,7 +11,9 @@ tracker can read, never a silent pass. A capability names what a node
 *can do*, not how it spells the call that does it: `Capability.CONNECT`
 covers what `node.connect_nodes` does, and `BtcdAdapter`, whose node
 takes `addnode` with one argument fewer, declares the same member and
-spells the call its own way in `dial`.
+spells the call its own way in `dial`. A wallet factory declares what
+its wallets can do, as `wallet.WalletCapability`, and a test needing one
+it lacks skips and is counted the same way.
 
 A fact that differs between two builds of one node is read from the
 build under test, never fixed as a class-wide constant
@@ -112,6 +114,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Iterator, Mapping
 
+    from btclib_functional_tests.wallet import WalletCapability
+
 __all__ = [
     "Capability",
     "MissingCapabilityError",
@@ -121,7 +125,7 @@ __all__ = [
 
 
 class MissingCapabilityError(Exception):
-    """Raised by `require` when the node under test does not declare it.
+    """Raised by `require` when the node or the wallet factory lacks it.
 
     Not `pytest.skip.Exception`: this module's own docstring has why.
     """
@@ -382,8 +386,7 @@ class Capability(Enum):
     Not `MINE`: that names a block the node accepts as its tip, which a
     node without a wallet still offers over `submitblock`, where this
     names the wallet itself. A wallet a separate program keeps for a node
-    is not this member either
-    ([ISS functional-tests#199](https://github.com/btclib-org/functional-tests/issues/199)).
+    is not this member either: `wallet.WalletAdapter` reaches it.
     `TX_RECONCILIATION` -- offer and accept BIP330's transaction
     reconciliation once `-txreconciliation` asks for it, Core's own
     switch: `sendtxrcncl` sent to a peer that relays transactions, and a
@@ -703,6 +706,10 @@ class Capability(Enum):
     ADDRESS_TABLES = "address_tables"
 
 
+# a `Capability` is a node's to declare, any other a wallet factory's
+_NODE_VALUES = frozenset(capability.value for capability in Capability)
+
+
 class SkipCounts:
     """One session's own tally of skips, one count per capability asked for.
 
@@ -710,34 +717,36 @@ class SkipCounts:
     against however many nodes prints one total per capability rather
     than one line per test -- the number rule 4 asks for is a count the
     node's tracker can read, not a running commentary.
+
+    A capability is counted under its value, the name the report prints:
+    a `Capability` and a `wallet.WalletCapability` alike, their values
+    being distinct.
     """
 
     def __init__(self) -> None:
-        self._counts: Counter[Capability] = Counter()
+        self._counts: Counter[str] = Counter()
 
-    def record(self, capability: Capability) -> None:
+    def record(self, capability: Enum) -> None:
         """Count one more skip against `capability`."""
-        self._counts[capability] += 1
+        self._counts[capability.value] += 1
 
-    def __iter__(self) -> Iterator[tuple[Capability, int]]:
-        """Yield `(capability, count)` for every capability ever recorded.
+    def __iter__(self) -> Iterator[tuple[str, int]]:
+        """Yield `(value, count)` for every capability ever recorded.
 
         Sorted by the capability's own value, so the report below reads
         the same from one run to the next rather than in whatever order
         a `Counter` happens to have built up.
         """
-        yield from sorted(self._counts.items(), key=lambda pair: pair[0].value)
+        yield from sorted(self._counts.items())
 
     def report(self) -> str:
         """Return one line per capability recorded, or say that none was."""
-        if not (
-            lines := [f"{capability.value}: {count}" for capability, count in self]
-        ):
+        if not (lines := [f"{value}: {count}" for value, count in self]):
             return "skips per capability: no test asked for one this run"
         return "skips per capability:\n" + "\n".join(lines)
 
     def as_mapping(self) -> dict[str, int]:
-        """Return this tally as a plain `{capability.value: count}` mapping.
+        """Return this tally as a plain `{value: count}` mapping.
 
         `tests/integration/conftest.py` is what this is for: an xdist
         worker's own tally has to cross to the controller through
@@ -745,26 +754,41 @@ class SkipCounts:
         data, never an `Enum` member -- `add_mapping` is this method's
         own inverse, on the controller's own tally.
         """
-        return {capability.value: count for capability, count in self}
+        return dict(self)
 
     def add_mapping(self, mapping: Mapping[str, int]) -> None:
         """Add counts from another tally's own `as_mapping` into this one.
 
-        :param mapping: a `{capability.value: count}` mapping, as
-            `as_mapping` returns.
+        :param mapping: a `{value: count}` mapping, as `as_mapping`
+            returns.
+        :raises ValueError: a key is the value of no `Capability` and of no
+            `wallet.WalletCapability`.
         """
-        for value, count in mapping.items():
-            self._counts[Capability(value)] += count
+        # imported here, not at the top: `wallet.py` imports this module
+        from btclib_functional_tests.wallet import (  # noqa: PLC0415
+            WalletCapability,
+        )
+
+        known = {member.value for member in (*Capability, *WalletCapability)}
+        for value in mapping:
+            if value not in known:
+                err_msg = f"not a capability: {value!r}"
+                raise ValueError(err_msg)
+        self._counts.update(mapping)
 
 
-def require(
-    capability: Capability, capabilities: AbstractSet[Capability], counts: SkipCounts
+def require[E: (Capability, WalletCapability)](
+    capability: E, capabilities: AbstractSet[E], counts: SkipCounts
 ) -> None:
     """Raise `MissingCapabilityError` unless `capability` is in `capabilities`.
 
-    :param capability: what the test about to run needs.
-    :param capabilities: what the node under test declares, an adapter's
-        own `capabilities`.
+    `E` is one of the two enums, never their union, so that a type checker
+    refuses a node's capability asked of a wallet factory's set.
+
+    :param capability: what the test about to run needs: a `Capability`
+        of a node, or a `wallet.WalletCapability` of a wallet factory.
+    :param capabilities: what the node or the wallet factory under test
+        declares, its own `capabilities`.
     :param counts: the session's own tally, credited before the raise so
         that a node lacking a capability still has that asked for it
         counted -- rule 4's "never a silent pass" reaching the count
@@ -773,5 +797,6 @@ def require(
     """
     if capability not in capabilities:
         counts.record(capability)
-        msg = f"node does not declare {capability.value}"
+        holder = "node" if capability.value in _NODE_VALUES else "wallet"
+        msg = f"{holder} does not declare {capability.value}"
         raise MissingCapabilityError(msg)

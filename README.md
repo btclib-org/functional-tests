@@ -47,9 +47,9 @@ interpreter `btclib-node` is installed into, or a `btcd` -- and skips
 cleanly without one. [CONTRIBUTING.md](./CONTRIBUTING.md)'s *The
 environment and the gates* has the commands.
 
-A test's skip names a capability the node it ran against does not
-declare, and the run prints one count per capability rather than
-passing in silence.
+A test's skip names a capability that the node it ran against, or the
+wallet factory it was given, does not declare, and the run prints one
+count per capability rather than passing in silence.
 
 ## CI
 

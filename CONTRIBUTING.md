@@ -355,12 +355,38 @@ Rule 1 of
 written in btclib's names, consensus constants keeping Core's spelling
 and no alias layer (rule 2).
 
+Rule 1 and this section are about nodes. A wallet under test may run in
+process, beside the node it reads the chain from
+([ISS 544](https://github.com/btclib-org/functional-tests/issues/544)).
+
+### Wallets
+
+A test written against `wallet.WalletAdapter` reaches its wallets only
+through it, and reads what only Core answers, an error's text or a
+result's whole shape, through `bitcoind_wallet.BitcoindWallet.rpc`
+where the wallet is bitcoind's. Its module hands the body a
+`wallet.WalletFactory`, and the body makes one or more wallets per node
+with it, after asking `require` for what the factory needs of each node
+and for each `wallet.WalletCapability` the test uses.
+`bitcoind_wallet.py` holds the implementation over bitcoind's own
+wallet. The wallet tests ported before the adapter call their wallet's
+RPC directly, and move onto it as
+[ISS 620](https://github.com/btclib-org/functional-tests/issues/620)
+ports them, except `wallet_disable`, `wallet_blank` and
+`wallet_createwalletdescriptor`, which stay bitcoind's, since each
+tests Core's own wallet management or its `-disablewallet`.
+
+The adapter syncs a wallet before each answer, so a test written
+against it never syncs one itself: `wallet.py`'s module docstring has
+why.
+
 ### The public surface
 
-The adapter under `src/btclib_functional_tests/` -- `bitcoind`, `btcd`,
-`btclib_node`, `capability`, `debug_log`, `feature_block`, `mempool_util`,
-`mini_wallet`, `node`, `peer`, `socks5`, `timeout_factor` -- is each its own
-submodule with its own `__all__`, and
+The adapter under `src/btclib_functional_tests/` -- `bitcoind`,
+`bitcoind_wallet`, `btcd`, `btclib_node`, `capability`, `debug_log`,
+`feature_block`, `mempool_util`, `mini_wallet`, `node`, `peer`, `socks5`,
+`timeout_factor`, `wallet` -- is each its own submodule with its own
+`__all__`, and
 `docs/source/btclib_functional_tests.rst` gives each an `automodule` section
 of its own. The package root re-exports none of them and keeps an empty
 `__all__` by decision, a caller importing the submodule it needs instead.
