@@ -440,15 +440,17 @@ skip-checking-raises = true
 
 [tool.check-sdist]
 # tracked files the sdist is meant not to carry. What
-# [tool.uv.build-backend] source-exclude would name is not repeated
-# here: check-sdist reads that list for the uv backend, so this holds
-# only what no include pattern adds in the first place -- the
-# workspaces of an editor and of an agent, and COPYRIGHT, which
-# `project.license-files` does not name. check-sdist's own default ignore
-# list already carries .github, so it needs no entry here. Patterns are
-# gitignore's, so a directory covers what is under it at any depth
+# [tool.uv.build-backend] source-exclude would name is not repeated here:
+# check-sdist reads that list for the uv backend, so this holds only what
+# no include pattern adds in the first place -- the workspaces of an
+# editor and of an agent, the file prettier reads its ignores from, and
+# COPYRIGHT, which `project.license-files` does not name. check-sdist's
+# own default ignore list already carries .github, so it needs no entry
+# here. Patterns are gitignore's, so a directory covers what is under it
+# at any depth
 git-only = [
     ".claude/",
+    ".prettierignore",
     ".vscode/",
     "COPYRIGHT",
 ]
