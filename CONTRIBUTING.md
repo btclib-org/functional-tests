@@ -370,7 +370,8 @@ implementation over bitcoind's own wallet. The wallet tests ported
 before the adapter call their wallet's RPC directly, and move onto it
 as [ISS 620](https://github.com/btclib-org/functional-tests/issues/620)
 ports them, except `wallet_disable`, `wallet_blank` and
-`wallet_createwalletdescriptor`, which stay bitcoind's.
+`wallet_createwalletdescriptor`, which stay bitcoind's, since each
+tests Core's own wallet management or its `-disablewallet`.
 
 The adapter syncs a wallet before each answer, so a test written
 against it never syncs one itself: `wallet.py`'s module docstring has

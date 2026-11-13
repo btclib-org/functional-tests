@@ -4,17 +4,21 @@
 
 """`BitcoindWallet`: `wallet.WalletAdapter` over bitcoind's own wallet.
 
-The oracle's side of a wallet test: each method is one call of Core's
-wallet RPC, at the wallet's own endpoint (`/wallet/<name>`), its answer
-read into the protocol's types. Amounts cross in satoshi on this side
-and in bitcoin on the RPC's.
+The oracle's side of a wallet test: each method calls Core's wallet
+RPC at the wallet's own endpoint (`/wallet/<name>`) and reads the
+answer into the protocol's types. Each makes one call, except `spend`,
+which makes two, `send` and then `gettransaction` through
+`transaction`. `unload` and `load` are the exception to the endpoint:
+`unloadwallet` and `loadwallet` are the node's, at its own endpoint,
+naming the wallet in their parameters. Amounts cross in satoshi on this
+side and in bitcoin on the RPC's.
 
-Before each call, `syncwithvalidationinterfacequeue` lets the node
-deliver every block and mempool notification it has queued to its
-wallets, as Core's own `sync_mempools` (`test_framework.py`) does. A
-wallet RPC already waits for the blocks (`BlockUntilSyncedToCurrentChain`,
-`src/wallet/wallet.h`), and not for a transaction relayed into the
-mempool.
+Before each call at the wallet's endpoint,
+`syncwithvalidationinterfacequeue` lets the node deliver every block
+and mempool notification it has queued to its wallets, as Core's own
+`sync_mempools` (`test_framework.py`) does. A wallet RPC already waits
+for the blocks (`BlockUntilSyncedToCurrentChain`, `src/wallet/wallet.h`),
+and not for a transaction relayed into the mempool.
 
 `BitcoindWalletFactory` is the `wallet.WalletFactory` a test module
 hands its body, over a node that declares `Capability.NODE_WALLET`.
@@ -100,9 +104,7 @@ def _on_chain(tx: Tx, network: str) -> Tx:
 
 def _code(value: object) -> int | None:
     """Return `value` where it is an error code Core could send, else None."""
-    if isinstance(value, bool) or not isinstance(value, int):
-        return None
-    return value
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
 
 
 def _int(value: object, field: str) -> int:

@@ -49,9 +49,16 @@ from btclib_functional_tests.wallet import WalletCapability
 def capability_messages() -> frozenset[str]:
     """Return every message `capability.require`'s refusal can carry."""
     messages: set[str] = set()
-    for capability in (*Capability, *WalletCapability):
+    # one loop per enum: `require` takes one of the two, never their union,
+    # and a loop over both would type `capability` as `Any`
+    for capability in Capability:
         try:
             require(capability, frozenset(), SkipCounts())
+        except MissingCapabilityError as exc:
+            messages.add(str(exc))
+    for wallet_capability in WalletCapability:
+        try:
+            require(wallet_capability, frozenset(), SkipCounts())
         except MissingCapabilityError as exc:
             messages.add(str(exc))
     return frozenset(messages)
