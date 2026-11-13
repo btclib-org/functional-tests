@@ -369,7 +369,13 @@ where the wallet is bitcoind's. Its module hands the body a
 with it, after asking `require` for what the factory needs of each node
 and for each `wallet.WalletCapability` the test uses.
 `bitcoind_wallet.py` holds the implementation over bitcoind's own
-wallet. The wallet tests ported before the adapter call their wallet's
+wallet, and `btclib_wallet_adapter.py` the one over btclib-wallet's
+`Ledger`, which runs in this process and reads the chain from bitcoind's
+RPC ([ISS 619](https://github.com/btclib-org/functional-tests/issues/619)).
+A ported wallet test has a `<file>_btclib_wallet_test.py` module beside
+its `<file>_bitcoind_test.py` one, which runs only with
+`TF2_BTCLIB_WALLET` set, and `TF2.md`'s *The btclib-wallet ledger* gives
+its verdicts. The wallet tests ported before the adapter call their wallet's
 RPC directly, and move onto it as
 [ISS 620](https://github.com/btclib-org/functional-tests/issues/620)
 ports them, except `wallet_disable`, `wallet_blank` and
@@ -383,7 +389,8 @@ why.
 ### The public surface
 
 The adapter under `src/btclib_functional_tests/` -- `bitcoind`,
-`bitcoind_wallet`, `btcd`, `btclib_node`, `capability`, `debug_log`,
+`bitcoind_wallet`, `btcd`, `btclib_node`, `btclib_wallet_adapter`,
+`capability`, `debug_log`,
 `feature_block`, `mempool_util`, `mini_wallet`, `node`, `peer`, `socks5`,
 `timeout_factor`, `wallet` -- is each its own submodule with its own
 `__all__`, and
@@ -413,7 +420,9 @@ a `bitcoind` on `PATH` or named directly, the interpreter
 carries no group installing it (`pyproject.toml`'s comment on
 `[dependency-groups]` has why) -- and a `btcd` on `PATH` or named
 directly. Each skips cleanly, naming what to set, rather than failing on
-a program this repository does not ship.
+a program this repository does not ship. `TF2_BTCLIB_WALLET` switches
+on the btclib-wallet tests, which need no program of their own: the
+wallet is a dependency of this project, and runs in process.
 
 ```shell
 TF2_INTEGRATION=1 uv run pytest tests/integration
@@ -807,6 +816,23 @@ TF2_INTEGRATION=1 TF2_BITCOIND=<v29.4 or v30.3 bitcoind> \
     uv run pytest tests/integration/*_bitcoind_test.py
 ```
 
+`btclib-wallet` is `TF2_BITCOIND` pointed at the pinned release, with
+btclib-wallet's latest release installed over the locked environment and
+only the btclib-wallet tests run; `btclib-wallet-main` installs
+btclib-wallet's own `main` instead. Each compares its JUnit report with
+`TF2.md`'s *The btclib-wallet ledger*:
+
+```shell
+uv sync --locked --no-default-groups --group test
+uv pip install --upgrade btclib-wallet
+TF2_INTEGRATION=1 TF2_BTCLIB_WALLET=1 TF2_BITCOIND=<bitcoind> \
+    uv run --no-sync pytest tests/integration/*_btclib_wallet_test.py \
+    --junitxml=integration.xml
+uv run --no-sync python .github/scripts/check_node_ran.py integration.xml
+uv run --no-sync python .github/scripts/btclib_wallet_verdict.py \
+    TF2.md integration.xml release
+```
+
 `core-master` is `TF2_BITCOIND` pointed at a `bitcoind` built locally
 from Bitcoin Core's own `master`, the job's own `Configure the build`
 step naming the CMake options; its own verdict on a failure unique to
@@ -823,7 +849,8 @@ them or passing them beside it on the same sha, which is the reliance
 `REVIEWING.md` provides for.
 
 `node-integration.yml`'s other jobs -- `older-core`, `btclib-node`,
-`btcd`, `core-master` and `btclib-node-main` -- gate nothing anywhere:
+`btcd`, `btclib-wallet`, `core-master`, `btclib-node-main` and
+`btclib-wallet-main` -- gate nothing anywhere:
 `continue-on-error: true` in the workflow itself says so for each.
 `older-core` runs v29.4 and v30.3, which do not move; it is informational
 by decision, so that a flake on an older release blocks no merge.
@@ -831,10 +858,12 @@ by decision, so that a flake on an older release blocks no merge.
 fails is a finding.
 `btclib-node` installs btclib-node's latest release unpinned, so a new
 release moving a cell of `TF2.md`'s `btclib-node` column turns it red for
-a reason outside any pull request; `core-master` and `btclib-node-main`
+a reason outside any pull request, and `btclib-wallet` installs
+btclib-wallet's the same way; `core-master` and `btclib-node-main`
 track Core's own `master` and btclib-node's own `main` rather than the pinned
 release under test, by [ISS 8](https://github.com/btclib-org/functional-tests/issues/8)'s
-decision of 2026-09-25.
+decision of 2026-09-25, and `btclib-wallet-main` tracks btclib-wallet's
+own `main` as `btclib-node-main` does btclib-node's.
 
 `verified-signatures.yml` reports after each push to `main` whether every
 commit pushed is `verified`; [the standard's *Signatures*][s-sigs] has the rule.

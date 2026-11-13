@@ -9,8 +9,9 @@ Core's `wallet_*.py` drive bitcoind's built-in wallet, and this protocol
 lets one test body drive any wallet instead. A body is written once, in
 btclib's names: amounts in satoshi, transactions as `btclib.tx.Tx`, and
 each method named after the method of btclib-wallet's `Ledger` that
-answers it, where there is one. Each implementation translates, and
-`bitcoind_wallet.py` is the one over bitcoind's RPC wallet.
+answers it, where there is one. Each implementation translates:
+`bitcoind_wallet.py` is the one over bitcoind's RPC wallet, and
+`btclib_wallet_adapter.py` the one over btclib-wallet's `Ledger`.
 `CONTRIBUTING.md`'s *Wallets* says how a test reaches its wallets.
 
 Every method that reads the wallet or spends from it first lets the
@@ -43,7 +44,23 @@ __all__ = [
     "WalletAdapter",
     "WalletCapability",
     "WalletFactory",
+    "network_of",
 ]
+
+# btclib's network for each chain `NodeAdapter.chain` names, in Core's
+# own `-chain=` vocabulary
+_NETWORKS = {
+    "main": "mainnet",
+    "test": "testnet",
+    "testnet4": "testnet4",
+    "signet": "signet",
+    "regtest": "regtest",
+}
+
+
+def network_of(node: NodeAdapter) -> str:
+    """Return the node's chain by btclib's name, the one its addresses use."""
+    return _NETWORKS[node.chain]
 
 
 class WalletCapability(Enum):
@@ -109,10 +126,25 @@ class TxInfo:
     a confirmed transaction is trusted, and an unconfirmed one where the
     wallet sent it, it is in the mempool, and each input spends a trusted
     output of the wallet.
+
+    `confirmations` is 0 for a transaction in no block, and minus the
+    depth of the block that conflicts with a conflicted one. `amount` is
+    what the transaction adds to the wallet, its fee left out, negative
+    for a payment out. `fee` is what it pays, in satoshi and not
+    negative, and `None` where it spends none of the wallet's coins.
+    `abandoned` is whether `WalletAdapter.abandon` marked it, or a
+    transaction it descends from. `wallet_conflicts` is Core's
+    `walletconflicts`: the ids of the other transactions of the wallet
+    that spend one of its inputs, in display order.
     """
 
     tx: Tx
     trusted: bool
+    confirmations: int
+    amount: int
+    fee: int | None
+    abandoned: bool
+    wallet_conflicts: frozenset[bytes]
 
 
 class WalletAdapter(Protocol):
@@ -188,8 +220,28 @@ class WalletAdapter(Protocol):
         :param descriptor: with its checksum.
         """
 
+    def lock(self, outpoint: OutPoint) -> None:
+        """Keep an output out of what the wallet spends: Core's `lockunspent`.
+
+        `sign` still signs an input spending it.
+        """
+
+    def abandon(self, txid: bytes) -> None:
+        """Abandon a transaction: Core's `abandontransaction`.
+
+        It and each of its descendants count in no balance, and the
+        outputs they spend can be spent again.
+
+        :param txid: in display order.
+        :raises ValueError: the transaction is in a block or the mempool,
+            is conflicted, or is not the wallet's.
+        """
+
     def unload(self) -> None:
-        """Close the wallet: `WalletCapability.RELOAD`."""
+        """Close the wallet: `WalletCapability.RELOAD`.
+
+        It stays closed until `load`, its node's restarts included.
+        """
 
     def load(self) -> None:
         """Open the wallet again: `WalletCapability.RELOAD`."""

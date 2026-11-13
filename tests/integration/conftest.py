@@ -34,7 +34,9 @@ a function in `<file>_test.py`, named for Core's own file
 test from that module. Each `<file>_<node>_test.py` calls it from a test
 of the same name with the prefix, handing it that node's own fixture:
 `<node>_adapter` for one node, `<node>_cluster` for several, where
-`<node>` is `bitcoind`, `btclib_node` or `btcd`. The body asks
+`<node>` is `bitcoind`, `btclib_node` or `btcd`. A wallet test's
+`<file>_btclib_wallet_test.py` hands its body `btclib_wallets` beside
+`bitcoind_cluster`. The body asks
 `require` of the instances it was handed, never of an adapter class:
 `BtclibNodeAdapter.__init__` widens an instance's `capabilities` by
 probing the build it runs. A body that writes into its node's data
@@ -48,7 +50,8 @@ it returns (`feature_includeconf_test.py`). The test modules stay one
 per node, rather than one parametrized over the nodes, because the CI
 jobs select a node's tests by module: `node-integration.yml`'s
 `btclib-node` jobs run `*_btclib_node_test.py`, its `core-master` job
-`*_bitcoind_test.py`, and its `btcd` job `*_btcd_test.py`.
+`*_bitcoind_test.py`, its `btcd` job `*_btcd_test.py`, and its
+`btclib-wallet` jobs `*_btclib_wallet_test.py`.
 """
 
 from __future__ import annotations
@@ -64,6 +67,7 @@ import pytest
 from btclib_functional_tests.bitcoind import BitcoindAdapter
 from btclib_functional_tests.btcd import BtcdAdapter
 from btclib_functional_tests.btclib_node import BtclibNodeAdapter
+from btclib_functional_tests.btclib_wallet_adapter import BtclibWalletFactory
 from btclib_functional_tests.capability import SkipCounts
 from btclib_functional_tests.node import NodeAdapter, free_ports
 from btclib_functional_tests.timeout_factor import (
@@ -547,3 +551,24 @@ def btcd_cluster(
 ) -> Iterator[Callable[[int], list[BtcdAdapter]]]:
     """Yield `bitcoind_cluster`'s factory, over `BtcdAdapter`s instead."""
     yield from _cluster(make_adapter, BtcdAdapter, btcd_path, tmp_path_factory, "btcd")
+
+
+@pytest.fixture
+def btclib_wallets(
+    tmp_path_factory: pytest.TempPathFactory,
+) -> Iterator[BtclibWalletFactory]:
+    """Yield the btclib-wallet side's factory, closing its wallets after.
+
+    The wallet runs in this process, so no probe can tell a job that
+    means to run it from one that does not: `TF2_BTCLIB_WALLET` is the
+    switch, and without it the test skips as a target node that is not
+    installed does.
+    """
+    _require_integration()
+    if not os.environ.get("TF2_BTCLIB_WALLET"):
+        pytest.skip(f"{NO_TARGET}set TF2_BTCLIB_WALLET=1 to run btclib-wallet")
+    factory = BtclibWalletFactory(tmp_path_factory.mktemp("btclib-wallet"))
+    try:
+        yield factory
+    finally:
+        factory.close()

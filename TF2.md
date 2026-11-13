@@ -1031,6 +1031,9 @@ gh api --method GET repos/bitcoin/bitcoin/commits \
 | `wallet_anchor.py` | [`609d265ebc51`](https://github.com/bitcoin/bitcoin/commit/609d265ebc51) | 2025-09-03 | pass | skip (node_wallet) |
 | `wallet_disable.py` | [`3fd68a95e68b`](https://github.com/bitcoin/bitcoin/commit/3fd68a95e68b) | 2026-04-07 | pass | bitcoind only |
 | `wallet_balance.py` | [`fa6f7e36a8c2`](https://github.com/bitcoin/bitcoin/commit/fa6f7e36a8c2) | 2026-10-23 | pass | skip (node_wallet) |
+| `wallet_txn_doublespend.py` | [`3fd68a95e68b`](https://github.com/bitcoin/bitcoin/commit/3fd68a95e68b) | 2026-04-07 | pass | skip (node_wallet) |
+| `wallet_txn_doublespend.py` (`--mineblock`) | [`3fd68a95e68b`](https://github.com/bitcoin/bitcoin/commit/3fd68a95e68b) | 2026-04-07 | pass | skip (node_wallet) |
+| `wallet_abandonconflict.py` | [`fa6f7e36a8c2`](https://github.com/bitcoin/bitcoin/commit/fa6f7e36a8c2) | 2026-10-23 | pass | skip (node_wallet) |
 | `mempool_accept_wtxid.py` | [`fa704c5d3caf`](https://github.com/bitcoin/bitcoin/commit/fa704c5d3caf) | 2026-10-23 | pass | pass |
 | `rpc_orphans.py` | [`fa5f29774872`](https://github.com/bitcoin/bitcoin/commit/fa5f29774872) | 2025-12-16 | pass | pass |
 | `mining_template_verification.py` | [`6eca11175be6`](https://github.com/bitcoin/bitcoin/commit/6eca11175be6) | 2026-07-16 | pass | pass |
@@ -1557,3 +1560,31 @@ no entry here is a `bitcoind only` row, or has its reason in the docstring of
   `contrib/utxo-tools/utxo_to_sqlite.py`, a script of Core's source tree, not
   a node; what it asks of the node is `rpc_dumptxoutset.py`'s and
   `feature_utxo_set_hash.py`'s subject.
+
+## The btclib-wallet ledger
+
+The verdicts of the wallet tests on btclib-wallet
+([ISS 619](https://github.com/btclib-org/functional-tests/issues/619)).
+Each row is a row of the per-test ledger above, which keeps its pin,
+run with `btclib_wallet_adapter.py`'s wallets over the bitcoind
+`node-integration.yml` pins, so that a failure is the wallet's.
+
+A verdict is **pass**; **fail**, on a check reached after the wallet
+synced, naming the btclib-wallet issue it waits on; **skip**, naming the
+`wallet.WalletCapability` value the factory does not declare and the
+issue that would add it, as `skip (wallet_reload, [ISS ...])`;
+**stub**, naming the issue, where the test raises before its first
+check; or **flaky**, naming the btclib-wallet issue, where the test
+passes on some runs and fails on others, as a `btclib-node` **flaky**
+cell above does, and moves to **pass** the same way. A cell gives the
+verdict of each build the `btclib-wallet` and `btclib-wallet-main` jobs
+measure, the PyPI release and btclib-wallet's own `main`, spelled as a
+`btclib-node` cell above is. `.github/scripts/btclib_wallet_verdict.py`
+compares each cell with both runs.
+
+| Core test | btclib-wallet |
+| --- | --- |
+| `wallet_balance.py` | pass |
+| `wallet_txn_doublespend.py` | pass |
+| `wallet_txn_doublespend.py` (`--mineblock`) | pass |
+| `wallet_abandonconflict.py` | flaky ([ISS btclib-wallet#895](https://github.com/btclib-org/btclib-wallet/issues/895)) |

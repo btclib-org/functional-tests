@@ -46,6 +46,11 @@ dependencies = [
     "ecc>=2026.11.8",
     "bip32-descriptors>=2026.11.11",
     "bitcoin-core-rpc>=2026.9.24",
+    # the wallet `btclib_wallet_adapter.py` runs in process, beside the
+    # node it reads the chain from (CONTRIBUTING.md's *The one
+    # constraint*). The floor is the release the adapter was written
+    # and run against
+    "btclib-wallet>=2026.11.13",
 ]
 keywords = [
     # by relevance rather than alphabetical: PyPI shows keywords as they
@@ -400,6 +405,8 @@ ignore = [
 # the btclib-node verdict: the master-only verdict's own shape, its report
 # copied into $GITHUB_STEP_SUMMARY by the workflow step
 ".github/scripts/btclib_node_verdict.py" = ["T201"]
+# the btclib-wallet verdict: the btclib-node verdict's own shape
+".github/scripts/btclib_wallet_verdict.py" = ["T201"]
 "tests/**" = [
     "S101",   # assert
     "S311",   # non-cryptographic random: fine in tests
