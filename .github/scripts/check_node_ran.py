@@ -14,19 +14,19 @@ tests did not run" step is the same question for the `bitcoind` job,
 asked there by failing on every skip but one whose reason starts with
 the prefix that job declares, `tests/integration/conftest.py`'s
 `NO_TARGET`. That cannot hold here: a target node's run skips a test
-whose node does not declare the capability it needs, and rule 4 of
-issue btclib-org/btclib#2220 makes that skip a counted result rather
-than a defect.
+whose node, or whose wallet, does not declare the capability it needs,
+and rule 4 of issue btclib-org/btclib#2220 makes that skip a counted
+result rather than a defect.
 
 So this fails on a report holding no testcase, or on a skip whose
 message is not a capability's. A capability's message is read from
-`capability.require` itself, by making it refuse each `Capability` in
-turn, rather than copied here: the wording then has one home, and a
-change to it moves this check with it. Every other skip -- no
-`btclib_node` importable, no `bitcoind`, `TF2_INTEGRATION` unset -- is
-a test that never reached a node, and fails the run. A capability's skip
-does not: the fixture that found the node importable has already run by
-the time a test asks for one.
+`capability.require` itself, by making it refuse each `Capability` and
+each `wallet.WalletCapability` in turn, rather than copied here: the
+wording then has one home, and a change to it moves this check with it.
+Every other skip -- no `btclib_node` importable, no `bitcoind`,
+`TF2_INTEGRATION` unset -- is a test that never reached a node, and
+fails the run. A capability's skip does not: the fixture that found the
+node importable has already run by the time a test asks for one.
 
     python .github/scripts/check_node_ran.py integration.xml
 """
@@ -43,12 +43,13 @@ from btclib_functional_tests.capability import (
     SkipCounts,
     require,
 )
+from btclib_functional_tests.wallet import WalletCapability
 
 
 def capability_messages() -> frozenset[str]:
     """Return every message `capability.require`'s refusal can carry."""
     messages: set[str] = set()
-    for capability in Capability:
+    for capability in (*Capability, *WalletCapability):
         try:
             require(capability, frozenset(), SkipCounts())
         except MissingCapabilityError as exc:
@@ -93,10 +94,14 @@ def main() -> int:
     if not total or skips:
         print(
             f"::error::{total} test(s) collected, {len(skips)} skipped for a"
-            " reason other than a capability the node does not declare"
+            " reason other than a capability the node or the wallet does not"
+            " declare"
         )
         return 1
-    print(f"{total} test(s) collected, none skipped for want of a node")
+    print(
+        f"{total} test(s) collected, none skipped but for a capability the"
+        " node or the wallet does not declare"
+    )
     return 0
 
 

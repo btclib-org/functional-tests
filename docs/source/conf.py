@@ -97,7 +97,7 @@ intersphinx_cache_limit = 0
 # and source above:
 # curl -fsSL -o docs/source/_inventories/python.inv https://docs.python.org/3/objects.inv
 
-# What the mapping above does not answer for is two shapes, neither an
+# What the mapping above does not answer for are the shapes below, which no
 # inventory can fix, and each entry below carries its own reason rather
 # than a nitpick_ignore_regex that would give the check up entirely:
 #
@@ -120,6 +120,9 @@ intersphinx_cache_limit = 0
 #   evaluation for the whole signature, not only its own parameter, so
 #   every other annotation on the same line falls back to its bare source
 #   text and loses its cross-reference with it
+# - a type parameter, PEP 695's `[E: ...]`: autodoc leaves the parameter
+#   list out of the signature, and the annotation naming it becomes a
+#   reference to a class nothing documents
 nitpick_ignore: list[tuple[str, str]] = [
     # the second shape above: `peer.py`'s `Peer.wait_for` takes
     # `predicate: Callable[[Message], bool] | None`, and the fragment the
@@ -140,6 +143,10 @@ nitpick_ignore: list[tuple[str, str]] = [
     # same `node: NodeAdapter`: the third shape's cascade again, removing
     # `node`'s own annotation alone resolving it
     ("py:class", "Tx"),
+    # the fourth shape above: `capability.py`'s `require`, whose `E` is
+    # one of `Capability` and `wallet.WalletCapability`, as its own
+    # docstring says
+    ("py:class", "E"),
 ]
 
 source_suffix = [".rst", ".md"]

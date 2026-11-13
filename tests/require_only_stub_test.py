@@ -6,15 +6,15 @@
 
 [ISS 82](https://github.com/btclib-org/functional-tests/issues/82): a
 test whose body is only `del` statements and `require(...)` calls passes
-the moment the node under test declares every capability it names,
-without the scenario its own name claims ever running. This module is
-the AST walk that holds every function under `tests/integration/` to not
-being that shape -- parsed rather than imported, since the files it
-reads skip themselves without `TF2_INTEGRATION=1`. A stub that still
-ends in `del`/`require` alone is the defect this file exists to catch;
-one that ends in a terminal `pytest.fail(...)` call is not, whatever
-`require` decides once the node it addresses declares more than it does
-today.
+the moment the node, or the wallet factory, under test declares every
+capability it names, without the scenario its own name claims ever
+running. This module is the AST walk that holds every function under
+`tests/integration/` to not being that shape -- parsed rather than
+imported, since the files it reads skip themselves without
+`TF2_INTEGRATION=1`. A stub that still ends in `del`/`require` alone is
+the defect this file exists to catch; one that ends in a terminal
+`pytest.fail(...)` call is not, whatever `require` decides once the node
+or the wallet factory it addresses declares more than it does today.
 
 A stub also drifts from the twin it stands in for: the second walk below
 compares a `*_btclib_node_test.py` function's own ordered

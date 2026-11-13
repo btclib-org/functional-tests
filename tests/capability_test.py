@@ -14,6 +14,7 @@ from btclib_functional_tests.capability import (
     SkipCounts,
     require,
 )
+from btclib_functional_tests.wallet import WalletCapability
 from tests.conftest import pytest_runtest_call
 
 
@@ -29,7 +30,7 @@ def test_require_skips_a_missing_capability() -> None:
     counts = SkipCounts()
     with pytest.raises(MissingCapabilityError, match="connect"):
         require(Capability.CONNECT, frozenset(), counts)
-    assert list(counts) == [(Capability.CONNECT, 1)]
+    assert list(counts) == [("connect", 1)]
 
 
 def test_require_counts_every_skip_against_its_own_capability() -> None:
@@ -40,7 +41,7 @@ def test_require_counts_every_skip_against_its_own_capability() -> None:
             require(Capability.MINE, frozenset(), counts)
     with pytest.raises(MissingCapabilityError):
         require(Capability.CONNECT, frozenset(), counts)
-    assert list(counts) == [(Capability.CONNECT, 1), (Capability.MINE, 2)]
+    assert list(counts) == [("connect", 1), ("mine", 2)]
 
 
 def test_report_names_no_test_where_nothing_was_recorded() -> None:
@@ -92,7 +93,41 @@ def test_add_mapping_adds_onto_what_is_already_there() -> None:
     with pytest.raises(MissingCapabilityError):
         require(Capability.MINE, frozenset(), counts)
     counts.add_mapping({"mine": 2, "connect": 1})
-    assert list(counts) == [(Capability.CONNECT, 1), (Capability.MINE, 3)]
+    assert list(counts) == [("connect", 1), ("mine", 3)]
+
+
+def test_add_mapping_refuses_a_value_of_no_capability() -> None:
+    """A key no enum holds is refused, and nothing is added."""
+    counts = SkipCounts()
+    with pytest.raises(ValueError, match="not a capability: 'no_such'"):
+        counts.add_mapping({"mine": 1, "no_such": 1})
+    assert not list(counts)
+
+
+def test_add_mapping_takes_a_wallet_capability_s_value() -> None:
+    """A wallet capability's value is a capability, as a node's is."""
+    counts = SkipCounts()
+    counts.add_mapping({WalletCapability.RELOAD.value: 2})
+    assert list(counts) == [(WalletCapability.RELOAD.value, 2)]
+
+
+def test_a_wallet_capability_is_refused_as_the_wallet_s() -> None:
+    """A missing wallet capability names the wallet, and is counted too."""
+    counts = SkipCounts()
+    with pytest.raises(
+        MissingCapabilityError, match="^wallet does not declare wallet_reload$"
+    ):
+        require(WalletCapability.RELOAD, frozenset(), counts)
+    require(WalletCapability.RELOAD, frozenset({WalletCapability.RELOAD}), counts)
+    assert list(counts) == [("wallet_reload", 1)]
+
+
+def test_no_wallet_capability_shares_a_node_capability_s_value() -> None:
+    """The tally is keyed on the value, so two members never share one."""
+    node_values = {capability.value for capability in Capability}
+    wallet_values = {capability.value for capability in WalletCapability}
+    assert wallet_values
+    assert node_values.isdisjoint(wallet_values)
 
 
 def test_the_hookwrapper_generator_converts_a_thrown_exception() -> None:

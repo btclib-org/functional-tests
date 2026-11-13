@@ -22,6 +22,7 @@ from types import ModuleType
 import pytest
 
 from btclib_functional_tests.capability import Capability
+from btclib_functional_tests.wallet import WalletCapability
 
 _SCRIPT = Path(__file__).parents[1] / ".github" / "scripts" / "check_node_ran.py"
 
@@ -65,11 +66,13 @@ def _report(tmp_path: Path, cases: list[tuple[str, str | None]]) -> Path:
 
 
 def test_every_capability_has_its_message(check: ModuleType) -> None:
-    """Every `Capability` contributes the message `require` refuses it with."""
+    """Every capability contributes the message `require` refuses it with."""
     messages = check.capability_messages()
-    assert len(messages) == len(Capability)
+    assert len(messages) == len(Capability) + len(WalletCapability)
     for capability in Capability:
         assert f"node does not declare {capability.value}" in messages
+    for wallet_capability in WalletCapability:
+        assert f"wallet does not declare {wallet_capability.value}" in messages
 
 
 def test_a_capability_skip_is_not_counted(check: ModuleType, tmp_path: Path) -> None:
@@ -129,7 +132,8 @@ def test_main_passes_with_only_capability_skips(
     )
     monkeypatch.setattr(sys, "argv", ["check_node_ran.py", str(report)])
     assert check.main() == 0
-    assert "none skipped for want of a node" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "none skipped but for a capability the node or the wallet" in out
 
 
 def test_the_script_exits_with_main_s_own_status(
