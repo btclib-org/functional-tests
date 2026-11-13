@@ -162,8 +162,9 @@ class BitcoindWallet:
         where its wallet is a `BitcoindWallet`, what only Core answers: an
         error's text, or a result's whole shape. The protocol's methods
         make their wallet calls through it too, each after the node's
-        queue is delivered; a call a body makes through it waits for
-        nothing.
+        queue is delivered. A call a body makes through it is preceded by
+        no sync, so it waits for the blocks, as every wallet RPC does, and
+        not for the mempool.
         """
         return self._node.rpc.for_wallet(self._name)
 
