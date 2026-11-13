@@ -20,3 +20,12 @@ Use [TF2.md](./TF2.md) for the ledger of Bitcoin Core test-framework
 coverage, and its *Citing the framework from btclib and from tf2* section
 for how a framework file is cited. `tests/tf2_ledger_test.py` refuses a
 stated count in `TF2.md`; its docstring says why.
+
+## Code Review Rules
+
+Review against [REVIEWING.md](./REVIEWING.md). Its *The verdict* says
+which review opens with a verdict line and what every other review
+posts.
+
+The heading is the one Codex's GitHub review asks for
+([Customize what Codex reviews](https://learn.chatgpt.com/docs/third-party/github#customize-what-codex-reviews)).
