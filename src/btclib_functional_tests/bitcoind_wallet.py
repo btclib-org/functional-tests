@@ -14,21 +14,10 @@ endpoint: `unloadwallet` and `loadwallet` are the node's, called at its
 own endpoint with no sync, naming the wallet in their parameters.
 Amounts cross in satoshi on this side and in bitcoin on the RPC's.
 
-Before each call at the wallet's endpoint,
-`syncwithvalidationinterfacequeue` lets the node deliver every block
-and mempool notification it has queued to its wallets, as Core's own
-`sync_mempools` (`test_framework.py`) does. A wallet RPC that reads
-the wallet, such as `getbalances` or `gettransaction`, already waits
-for the blocks (`BlockUntilSyncedToCurrentChain`, `src/wallet/wallet.h`),
-and so does `send`, through `FundTransaction`; none waits for a
-transaction relayed into the mempool, which the sync delivers.
-`importdescriptors` waits for neither, and its `timestamp` `"now"` is
-the wallet's synced blockchain time (`src/wallet/rpc/backup.cpp`),
-which the sync makes the time of the node's tip. `getnewaddress`,
-`getrawchangeaddress` and `signrawtransactionwithwallet`, which reads
-its inputs from the node (`findCoins`), wait for neither too; the sync
-comes before them as well, since `_call` makes it before every call it
-makes.
+Before each call it makes at the wallet's endpoint, the adapter calls
+`syncwithvalidationinterfacequeue` at the node's, so that what the node
+has accepted, a transaction relayed into its mempool included, has
+reached the wallet before the call.
 
 `BitcoindWalletFactory` is the `wallet.WalletFactory` a test module
 hands its body, over a node that declares `Capability.NODE_WALLET`.
@@ -170,11 +159,9 @@ class BitcoindWallet:
         It is no part of `wallet.WalletAdapter`. A body reads through it,
         where its wallet is a `BitcoindWallet`, what only Core answers: an
         error's text, or a result's whole shape. The protocol's methods
-        make their wallet calls through it too, each after the node's
-        queue is delivered. A call a body makes through it is preceded by
-        no sync: a read such as `getbalances` or `gettransaction` waits for
-        the blocks (`BlockUntilSyncedToCurrentChain`), and none waits for
-        the mempool.
+        make their wallet calls through it too, each after the adapter's
+        sync of the node's validation queue. A call a body makes through
+        it gets no such sync.
         """
         return self._node.rpc.for_wallet(self._name)
 

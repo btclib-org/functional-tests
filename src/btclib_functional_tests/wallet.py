@@ -13,13 +13,10 @@ answers it, where there is one. Each implementation translates, and
 `bitcoind_wallet.py` is the one over bitcoind's RPC wallet.
 `CONTRIBUTING.md`'s *Wallets* says how a test reaches its wallets.
 
-Every method that reads the wallet or spends from it first brings the
-wallet up to its node's chain and mempool. A block, a transaction
-relayed, a restart or a reconnection is then seen by the next call, as
-a bitcoind wallet RPC that reads the wallet, such as `getbalances`,
-already waits for its wallet to catch up with the chain
-(`BlockUntilSyncedToCurrentChain`, `src/wallet/wallet.h`), and no test
-can leave out a sync that only another implementation needs.
+Every method that reads the wallet or spends from it first lets the
+wallet catch up with what its node has accepted, blocks and relayed
+transactions alike, so that the call sees them, and no test can leave
+out a sync that only another implementation needs.
 """
 
 from __future__ import annotations
