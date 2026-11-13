@@ -6,12 +6,13 @@
 
 The oracle's side of a wallet test: each method calls Core's wallet
 RPC at the wallet's own endpoint (`/wallet/<name>`) and reads the
-answer into the protocol's types. Each makes one call, except `spend`,
-which makes two, `send` and then `gettransaction` through
-`transaction`. `unload` and `load` are the exception to the endpoint:
-`unloadwallet` and `loadwallet` are the node's, at its own endpoint,
-naming the wallet in their parameters. Amounts cross in satoshi on this
-side and in bitcoin on the RPC's.
+answer into the protocol's types. Each makes one call there, except
+`spend`, which makes two, `send` and then `gettransaction` through
+`transaction`, and each call there follows a sync at the node's own
+endpoint, below. `unload` and `load` are the exception to the
+endpoint: `unloadwallet` and `loadwallet` are the node's, called at its
+own endpoint with no sync, naming the wallet in their parameters.
+Amounts cross in satoshi on this side and in bitcoin on the RPC's.
 
 Before each call at the wallet's endpoint,
 `syncwithvalidationinterfacequeue` lets the node deliver every block
@@ -157,9 +158,12 @@ class BitcoindWallet:
     def rpc(self) -> BitcoinCoreRpcClient:
         """A client of this wallet's own endpoint, for Core's own answers.
 
-        A body reads through it what only Core answers: an error's text,
-        or a result's whole shape. No method of the protocol calls it, and
-        no call through it waits for the node's queue.
+        It is no part of `wallet.WalletAdapter`. A body reads through it,
+        where its wallet is a `BitcoindWallet`, what only Core answers: an
+        error's text, or a result's whole shape. The protocol's methods
+        make their wallet calls through it too, each after the node's
+        queue is delivered; a call a body makes through it waits for
+        nothing.
         """
         return self._node.rpc.for_wallet(self._name)
 

@@ -362,7 +362,9 @@ process, beside the node it reads the chain from
 ### Wallets
 
 A test written against `wallet.WalletAdapter` reaches its wallets
-only through it. Its module hands the body a `wallet.WalletFactory`,
+only through it, and reads what only Core answers, an error's text or
+a result's whole shape, through `bitcoind_wallet.BitcoindWallet.rpc`
+where the wallet is bitcoind's. Its module hands the body a `wallet.WalletFactory`,
 and the body makes one or more wallets per node with it, after asking
 `require` for what the factory needs of each node and for each
 `wallet.WalletCapability` the test uses. `bitcoind_wallet.py` holds the
