@@ -158,6 +158,38 @@ def _check_import(answer: object) -> None:
         raise ValueError(err_msg)
 
 
+def _by_code(
+    rpc: BitcoinCoreRpcClient, method: str, params: Mapping[str, object]
+) -> object:
+    """Return `rpc.call(method, params)`, refusing it by Core's code alone.
+
+    For a call whose refusal can quote what it carries. Core's
+    `createwallet` and `loadwallet` quote the wallet's name, or a path
+    ending in it (`src/wallet/rpc/wallet.cpp`, `src/wallet/walletdb.cpp`),
+    and `send` quotes an address it refuses
+    (`src/rpc/rawtransaction_util.cpp`), at bitcoin/bitcoin@f0de87f040,
+    the v32.1 tag. `unloadwallet` quotes no name there, though it carries
+    one. The client's own text of a failure can quote it too: it names a
+    wallet's endpoint, whose path holds the wallet's name, and it quotes
+    whole an error object it cannot read.
+
+    :raises ValueError: Core refused the call; the message names the
+        method and Core's code where that is an integer, `None` otherwise.
+    :raises RuntimeError: the call failed otherwise; the message names the
+        method and the exception's type alone.
+    """
+    refusal: Exception
+    try:
+        return rpc.call(method, params)
+    except RpcError as exc:
+        refusal = ValueError(f"{method} refused: code {_code(exc.code)}")
+    # any other failure of the call may quote what it carries too
+    except Exception as exc:  # noqa: BLE001
+        refusal = RuntimeError(f"{method} raised {type(exc).__name__}")
+    # raised here, outside the `except` blocks, so it has no context
+    raise refusal
+
+
 class BitcoindWallet:
     """One of bitcoind's wallets, as `wallet.WalletAdapter` drives it."""
 
@@ -334,6 +366,11 @@ class BitcoindWallet:
         transaction returned is `transaction`'s. A refused broadcast
         leaves the transaction in the wallet where the node runs with
         `BitcoindWalletFactory.node_args`.
+
+        :raises ValueError: Core refused `send`, as it refuses two outputs
+            paying one script; the message names its code and no address
+            (`_by_code`).
+        :raises RuntimeError: `send` failed otherwise (`_by_code`).
         """
         network = self.network
         payees = [
@@ -344,7 +381,10 @@ class BitcoindWallet:
             }
             for tx_out in outputs
         ]
-        answer = _dict(self._call("send", {"outputs": payees}), "send")
+        # outside `_by_code`: the sync carries no address, and its own
+        # failure is not the spend's
+        self._sync()
+        answer = _dict(_by_code(self.rpc, "send", {"outputs": payees}), "send")
         txid = bytes.fromhex(str(answer["txid"]))
         return self.transaction(txid).tx
 
@@ -413,15 +453,29 @@ class BitcoindWallet:
         """Unload the wallet with `unloadwallet`, and off the startup list.
 
         So a restart of the node leaves it unloaded until `load`.
+
+        :raises ValueError: Core refused the call; the message names its
+            code and not the wallet (`_by_code`).
+        :raises RuntimeError: the call failed otherwise (`_by_code`).
         """
-        self._node.rpc.call(
-            "unloadwallet", {"wallet_name": self._name, "load_on_startup": False}
+        _by_code(
+            self._node.rpc,
+            "unloadwallet",
+            {"wallet_name": self._name, "load_on_startup": False},
         )
 
     def load(self) -> None:
-        """Load the wallet again with `loadwallet`, and on the startup list."""
-        self._node.rpc.call(
-            "loadwallet", {"filename": self._name, "load_on_startup": True}
+        """Load the wallet again with `loadwallet`, and on the startup list.
+
+        :raises ValueError: Core refused the call, as it refuses a wallet
+            already loaded; the message names its code and not the wallet
+            (`_by_code`).
+        :raises RuntimeError: the call failed otherwise (`_by_code`).
+        """
+        _by_code(
+            self._node.rpc,
+            "loadwallet",
+            {"filename": self._name, "load_on_startup": True},
         )
 
 
@@ -455,6 +509,13 @@ class BitcoindWalletFactory:
 
         `load_on_startup` is what Core's own `init_wallet`
         (`test_framework.py`) passes, so a restarted node loads it again.
+
+        :raises ValueError: Core refused the call, as it refuses a name
+            whose wallet exists; the message names its code and not the
+            name (`_by_code`).
+        :raises RuntimeError: the call failed otherwise (`_by_code`).
         """
-        node.rpc.call("createwallet", {"wallet_name": name, "load_on_startup": True})
+        _by_code(
+            node.rpc, "createwallet", {"wallet_name": name, "load_on_startup": True}
+        )
         return BitcoindWallet(node, name)
