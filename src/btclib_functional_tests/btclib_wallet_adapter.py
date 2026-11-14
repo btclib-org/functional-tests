@@ -153,7 +153,8 @@ class BtclibWallet:
     """One ledger of btclib-wallet, as `wallet.WalletAdapter` drives it.
 
     Made in a new file at `path`, holding the module docstring's one
-    source, born at the height `backend` reads.
+    source, born at the height `backend` reads. Where making it fails,
+    no file is left at `path`, so a wallet made next can take that path.
     """
 
     def __init__(
@@ -164,8 +165,15 @@ class BtclibWallet:
         self._path = path
         self._backend = backend
         self._ledger: Ledger | None = None
+        source = _new_source(self.network)
+        height = backend.get_block_count()
         self._open(create=True)
-        self.ledger.add_source(_new_source(self.network), backend.get_block_count())
+        try:
+            self.ledger.add_source(source, height)
+        except BaseException:
+            self.close()
+            path.unlink()
+            raise
 
     @property
     def node(self) -> NodeAdapter:

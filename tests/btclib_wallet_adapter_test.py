@@ -13,7 +13,7 @@ there.
 from __future__ import annotations
 
 import hashlib
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, cast, override
 
 import pytest
 from bitcoin_core_rpc import BitcoinCoreRpcClient
@@ -32,6 +32,7 @@ from btclib_wallet.fetch.history import (
     history_scripts,
 )
 from btclib_wallet.fetch.relay_fees import RelayFees
+from btclib_wallet.ledger import Ledger
 
 from btclib_functional_tests import btclib_wallet_adapter
 from btclib_functional_tests.btclib_wallet_adapter import (
@@ -214,6 +215,48 @@ def test_two_wallets_of_one_name_have_a_file_each(tmp_path: Path) -> None:
         "0-w.sqlite",
         "1-w.sqlite",
     ]
+    factory.close()
+
+
+class _Unreachable(_Chain):
+    """A chain whose node does not answer for its height."""
+
+    @override
+    def get_block_count(self) -> int:
+        err_msg = "no height"
+        raise FetchError(err_msg)
+
+
+def test_a_wallet_not_made_leaves_no_file(tmp_path: Path) -> None:
+    """The node's height is read before the file is made."""
+    chains = iter([_Unreachable(), _Chain()])
+    factory = BtclibWalletFactory(tmp_path, lambda _: next(chains))
+    node = cast("NodeAdapter", _Node())
+    with pytest.raises(FetchError, match="no height"):
+        factory.create(node, "w")
+    assert not list(tmp_path.iterdir())
+    assert factory.create(node, "w").name == "w"
+    factory.close()
+
+
+def test_a_source_not_added_leaves_no_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The ledger is closed and its file removed, so the path is free."""
+    chain = _Chain()
+    factory = BtclibWalletFactory(tmp_path, lambda _: chain)
+    node = cast("NodeAdapter", _Node())
+
+    def refuse(*_: object) -> int:
+        err_msg = "no source"
+        raise RuntimeError(err_msg)
+
+    with monkeypatch.context() as patched:
+        patched.setattr(Ledger, "add_source", refuse)
+        with pytest.raises(RuntimeError, match="no source"):
+            factory.create(node, "w")
+    assert not list(tmp_path.iterdir())
+    assert factory.create(node, "w").name == "w"
     factory.close()
 
 
