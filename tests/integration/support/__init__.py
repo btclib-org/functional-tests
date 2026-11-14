@@ -3,4 +3,3 @@
 # LICENSE file or https://opensource.org/license/mit for the full text.
 
 "Support modules for integration tests."
-

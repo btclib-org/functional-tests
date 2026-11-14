@@ -149,19 +149,19 @@ from btclib_functional_tests.mini_wallet import (
     Utxo,
 )
 from btclib_functional_tests.node import wait_until
-from tests.integration.support.p2p_conns import Clock, RelayConn
 from tests.integration.p2p_private_broadcast_test import malleated_to_invalid_witness
+from tests.integration.rpc_echo_payload_test import (
+    client_per_call,
+    serves_through_libevent,
+)
+from tests.integration.rpc_orphans_test import in_orphanage
+from tests.integration.support.p2p_conns import Clock, RelayConn
 from tests.integration.support.p2pk_coins import (
     mine_p2pk_coins,
     p2pk_new_utxo,
     p2pk_self_transfer,
     p2pk_self_transfer_multi,
 )
-from tests.integration.rpc_echo_payload_test import (
-    client_per_call,
-    serves_through_libevent,
-)
-from tests.integration.rpc_orphans_test import in_orphanage
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
