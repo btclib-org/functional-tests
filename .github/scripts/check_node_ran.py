@@ -9,14 +9,16 @@ stopped finding the node stays green while asking it nothing -- for
 `node-integration.yml`'s two btclib-node jobs, an install that succeeds
 followed by an `import btclib_node` that raises under
 `btclib_node_python`'s probe; for its `btcd` job, a `btcd_path` that
-finds no btcd. `reusable-integration-bitcoind.yml`'s "Fail if the node
-tests did not run" step is the same question for the `bitcoind` job,
-asked there by failing on every skip but one whose reason starts with
-the prefix that job declares, `tests/integration/conftest.py`'s
-`NO_TARGET`. That cannot hold here: a target node's run skips a test
-whose node, or whose wallet, does not declare the capability it needs,
-and rule 4 of issue btclib-org/btclib#2220 makes that skip a counted
-result rather than a defect.
+finds no btcd; for its btclib-wallet jobs, a `btclib_wallets` that
+finds `TF2_BTCLIB_WALLET` unset. `reusable-integration-bitcoind.yml`'s
+"Fail if the node tests did not run" step is the same question for the
+`bitcoind` job, asked there by failing on every skip but one whose
+reason starts with the prefix that job declares,
+`tests/integration/conftest.py`'s `NO_TARGET`. That cannot hold here:
+a target node's run skips a test whose node, or whose wallet, does not
+declare the capability it needs, and rule 4 of issue
+btclib-org/btclib#2220 makes that skip a counted result rather than a
+defect.
 
 So this fails on a report holding no testcase, or on a skip whose
 message is not a capability's. A capability's message is read from

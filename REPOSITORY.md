@@ -140,8 +140,7 @@ moving a job is free and renaming one is not.
 standard](https://github.com/btclib-org/.github#the-set-and-its-cadence)
 says when a tree requires `sourcery / Sourcery`.
 
-`node-integration.yml`'s other jobs -- `older-core`, `btclib-node`,
-`core-master` and `btclib-node-main` -- produce no required check: each
+`node-integration.yml`'s other jobs produce no required check: each
 runs with `continue-on-error: true` and reports rather than gates.
 `older-core` runs v29.4 and v30.3, which do not move; it is informational
 by decision, so that a flake on an older release blocks no merge. `btclib-node`
