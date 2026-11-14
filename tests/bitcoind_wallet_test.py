@@ -718,6 +718,84 @@ def test_any_other_failure_of_the_import_names_its_type_alone() -> None:
     _assert_no_key(excinfo.value)
 
 
+def _manage(method: str, node: _ClientNode) -> Callable[[], object]:
+    """Return the call of the method that sends `method`, a WIF as the name."""
+    adapter = cast("NodeAdapter", node)
+    calls: dict[str, Callable[[], object]] = {
+        "createwallet": lambda: BitcoindWalletFactory().create(adapter, _WIF),
+        "loadwallet": BitcoindWallet(adapter, _WIF).load,
+        "unloadwallet": BitcoindWallet(adapter, _WIF).unload,
+    }
+    return calls[method]
+
+
+@pytest.mark.parametrize(
+    "method, code, message",
+    [
+        (
+            "createwallet",
+            -4,
+            (
+                "Wallet file verification failed. Failed to create database path "
+                f"'/datadir/regtest/wallets/{_WIF}'. Database already exists."
+            ),
+        ),
+        ("loadwallet", -35, f'Wallet "{_WIF}" is already loaded.'),
+        ("unloadwallet", -18, "Requested wallet does not exist or is not loaded"),
+    ],
+)
+def test_a_refusal_of_a_call_naming_the_wallet_names_the_code_alone(
+    method: str, code: int, message: str
+) -> None:
+    """Core's v32.1 texts are not relayed.
+
+    `createwallet`'s and `loadwallet`'s quote the name, here a WIF.
+    """
+    node = _ClientNode(_client({"code": code, "message": message}, method))
+    with pytest.raises(ValueError, match=f"^{method} refused: code {code}$") as excinfo:
+        _manage(method, node)()
+    _assert_no_key(excinfo.value)
+
+
+@pytest.mark.parametrize("method", ["createwallet", "loadwallet", "unloadwallet"])
+def test_any_other_failure_naming_the_wallet_names_its_type_alone(
+    method: str,
+) -> None:
+    """An error object the client cannot read, and quotes, is not relayed."""
+    node = _ClientNode(_client(_WIF, method))
+    with pytest.raises(RuntimeError, match=f"^{method} raised FetchError$") as excinfo:
+        _manage(method, node)()
+    _assert_no_key(excinfo.value)
+
+
+def test_a_refused_send_names_the_code_and_not_the_address() -> None:
+    """Core's v32.1 text quotes the address of two outputs paying one script.
+
+    The address is of a key given as a witness program, and the wallet's
+    endpoint, in the client's text, holds its name, a WIF: neither is
+    relayed.
+    """
+    script = b"\x00\x20" + (7).to_bytes(32, "big")
+    payee = address(script, "regtest")
+    error = {"code": -8, "message": f"Invalid parameter, duplicated address: {payee}"}
+    methods: list[str] = []
+    node = _ClientNode(_client(error, "send", methods))
+    wallet = BitcoindWallet(cast("NodeAdapter", node), _WIF)
+    with pytest.raises(ValueError, match="^send refused: code -8$") as excinfo:
+        wallet.spend([TxOut(1, script), TxOut(2, script)])
+    _assert_no_key(excinfo.value, (payee, _WIF))
+    assert methods == ["syncwithvalidationinterfacequeue", "send"]
+
+
+def test_any_other_failure_of_send_names_its_type_alone() -> None:
+    """The client's text names the endpoint, which holds the wallet's name."""
+    node = _ClientNode(_client({"code": "-8", "message": _WIF}, "send"))
+    wallet = BitcoindWallet(cast("NodeAdapter", node), _WIF)
+    with pytest.raises(RuntimeError, match="^send raised FetchError$") as excinfo:
+        wallet.spend([TxOut(1, _SCRIPT)])
+    _assert_no_key(excinfo.value)
+
+
 def test_a_failed_sync_before_an_import_is_the_sync_s_own_error() -> None:
     """The sync's error names the sync, and the import is never called."""
     methods: list[str] = []
