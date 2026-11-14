@@ -818,8 +818,7 @@ TF2_INTEGRATION=1 TF2_BITCOIND=<v29.4 or v30.3 bitcoind> \
 
 `btclib-wallet` is `TF2_BITCOIND` pointed at the pinned release, with
 btclib-wallet's latest release installed over the locked environment and
-only the btclib-wallet tests run; `btclib-wallet-main` installs
-btclib-wallet's own `main` instead. Each compares its JUnit report with
+only the btclib-wallet tests run. It compares its JUnit report with
 `TF2.md`'s *The btclib-wallet ledger*:
 
 ```shell
@@ -831,6 +830,16 @@ TF2_INTEGRATION=1 TF2_BTCLIB_WALLET=1 TF2_BITCOIND=<bitcoind> \
 uv run --no-sync python .github/scripts/check_node_ran.py integration.xml
 uv run --no-sync python .github/scripts/btclib_wallet_verdict.py \
     TF2.md integration.xml release
+```
+
+`btclib-wallet-main` runs the same commands except two: it installs
+btclib-wallet's own `main` in place of the release, and asks the verdict
+for `main`:
+
+```shell
+uv pip install "git+https://github.com/btclib-org/btclib-wallet@main"
+uv run --no-sync python .github/scripts/btclib_wallet_verdict.py \
+    TF2.md integration.xml main
 ```
 
 `core-master` is `TF2_BITCOIND` pointed at a `bitcoind` built locally

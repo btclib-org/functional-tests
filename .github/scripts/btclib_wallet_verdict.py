@@ -45,7 +45,7 @@ It exits 1 wherever anything moved, a row that now passes included, and
 writes to stdout alone, which the workflow step copies into
 `$GITHUB_STEP_SUMMARY`:
 
-    python .github/scripts/btclib_wallet_verdict.py \
+    uv run --no-sync python .github/scripts/btclib_wallet_verdict.py \
         TF2.md integration.xml release
 """
 
