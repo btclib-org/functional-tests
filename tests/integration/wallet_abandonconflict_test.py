@@ -151,6 +151,8 @@ def _check_listsinceblock(alice: WalletAdapter, txid: bytes) -> None:
         for entry in answer["transactions"]
         if entry["txid"] == txid.hex() and entry["category"] == "send"
     ]
+    # Core's loop asserts nothing where the payment is missing
+    assert entries
     for entry in entries:
         assert entry["abandoned"] is True
         assert entry["confirmations"] == 0

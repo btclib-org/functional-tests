@@ -383,19 +383,19 @@ class BtclibWallet:
     def import_descriptor(self, descriptor: str) -> None:
         """Add `descriptor` with `Ledger.add_source`, reading no earlier block.
 
-        :raises ValueError: btclib-wallet refused the descriptor; the
-            message names the exception's type alone, since its text can
-            quote a key.
+        :raises ValueError: btclib-wallet refused the descriptor, reading
+            it or adding it; the message names the exception's type alone,
+            since its text can quote a key.
         """
         ledger = self._synced()
         refusal: Exception
         try:
             source = DescriptorWallet.from_descriptor(descriptor, self.network, {})
-        # any failure to read a descriptor carrying a key may quote it
+            ledger.add_source(source, None)
+        # any failure to read or add a descriptor carrying a key may quote it
         except Exception as exc:  # noqa: BLE001
             refusal = ValueError(f"descriptor not imported: {type(exc).__name__}")
         else:
-            ledger.add_source(source, None)
             return
         # raised here, outside the `except` block, so it has no context
         raise refusal

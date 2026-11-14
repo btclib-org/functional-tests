@@ -19,12 +19,15 @@ from typing import TYPE_CHECKING, cast, override
 import pytest
 from bitcoin_core_rpc import BitcoinCoreRpcClient
 from btclib.b58 import wif_from_prv_key
+from btclib.exceptions import BTClibValueError
 from btclib.fee import FeeRate
 from btclib.key import PrvKeyData
+from btclib.network import NETWORKS
 from btclib.script import ScriptPubKey
 from btclib.script.engine import verify_input
 from btclib.script.witness import Witness
 from btclib.tx import OutPoint, Tx, TxIn, TxOut
+from btclib_wallet.bip32.bip32 import rootxprv_from_seed
 from btclib_wallet.descriptors.descriptors import add_checksum
 from btclib_wallet.exceptions import FetchError
 from btclib_wallet.fetch.bitcoin_core import BitcoinCoreFetcher
@@ -575,6 +578,40 @@ def test_a_refused_import_names_the_exception_s_type_alone(
     assert _WIF not in str(excinfo.value)
     assert excinfo.value.__cause__ is None
     assert excinfo.value.__context__ is None
+
+
+def test_an_import_the_locked_ledger_refuses_names_its_type_alone(
+    made: tuple[BtclibWallet, _Chain],
+) -> None:
+    """A descriptor that parses, refused by `Ledger.add_source`.
+
+    An encrypted ledger whose keys are locked refuses a source holding a
+    private key.
+    """
+    wallet, _ = made
+    xprv = rootxprv_from_seed(bytes(range(32)), NETWORKS["regtest"].bip32_prv)
+    wallet.ledger.encrypt("passphrase")
+    wallet.ledger.lock_keys()
+    with pytest.raises(
+        ValueError, match="^descriptor not imported: BTClibValueError$"
+    ) as excinfo:
+        wallet.import_descriptor(add_checksum(f"wpkh({xprv}/0/*)"))
+    _assert_secret_free(excinfo.value, xprv)
+
+
+def test_a_refusal_of_add_source_quoting_the_key_is_not_relayed(
+    made: tuple[BtclibWallet, _Chain], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """What `Ledger.add_source` says of the descriptor is named by type."""
+    wallet, _ = made
+    descriptor = add_checksum(f"wpkh({_WIF})")
+    refusal = BTClibValueError(f"not added: {descriptor}")
+    monkeypatch.setattr(Ledger, "add_source", _refused_source(refusal))
+    with pytest.raises(
+        ValueError, match="^descriptor not imported: BTClibValueError$"
+    ) as excinfo:
+        wallet.import_descriptor(descriptor)
+    _assert_secret_free(excinfo.value, _WIF)
 
 
 def test_a_locked_output_is_not_listed(
