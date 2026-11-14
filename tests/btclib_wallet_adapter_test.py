@@ -77,14 +77,20 @@ _ADDRESS = ScriptPubKey.p2wpkh(PrvKeyData(11, network="regtest").pub).address
 _KEY = (7).to_bytes(32, "big")
 
 
-def _assert_secret_free(exc: BaseException, secret: bytes) -> None:
+def _assert_secret_free(exc: BaseException, secret: bytes | str) -> None:
     """Assert `secret` is in no text, argument or attribute of `exc`.
 
-    Each spelling a refusal could print is asked, and `exc` chains nothing:
+    Each spelling a refusal could print of a secret in bytes is asked, and
+    `exc` chains nothing:
     `__context__` is asked as well as `__cause__`, since `raise ... from
     None` hides the first from a traceback and keeps it.
     """
-    for spelling in (secret.hex(), secret[::-1].hex(), repr(secret)):
+    spellings = (
+        (secret,)
+        if isinstance(secret, str)
+        else (secret.hex(), secret[::-1].hex(), repr(secret))
+    )
+    for spelling in spellings:
         assert spelling not in str(exc)
         assert all(spelling not in repr(arg) for arg in exc.args)
         assert all(spelling not in repr(value) for value in vars(exc).values())
@@ -406,6 +412,7 @@ def test_sign_refuses_an_input_it_cannot_sign(
     with pytest.raises(ValueError, match="^inputs left unsigned$") as excinfo:
         wallet.sign(tx)
     assert excinfo.value.__cause__ is None
+    assert excinfo.value.__context__ is None
 
 
 def test_sign_refuses_an_input_another_party_signed(tmp_path: Path) -> None:
@@ -504,11 +511,25 @@ def test_unload_reads_the_node_then_load_answers_from_the_file(
     payment = _payment(wallet.new_address())
     chain.mempool.append(payment)
     wallet.unload()
-    with pytest.raises(ValueError, match="^wallet w is unloaded$"):
+    with pytest.raises(ValueError, match="^the wallet is unloaded$"):
         wallet.balance()
     chain.mempool = []
     wallet.load()
     assert wallet.transaction(payment.id).confirmations == 0
+
+
+def test_an_unloaded_wallet_named_with_a_key_does_not_quote_it(
+    tmp_path: Path,
+) -> None:
+    """The refusal leaves out the name, which can be a key given by mistake."""
+    chain = _Chain()
+    factory = BtclibWalletFactory(tmp_path, lambda _: chain)
+    wallet = factory.create(cast("NodeAdapter", _Node()), _WIF)
+    wallet.unload()
+    with pytest.raises(ValueError, match="^the wallet is unloaded$") as excinfo:
+        _ = wallet.ledger
+    _assert_secret_free(excinfo.value, _WIF)
+    factory.close()
 
 
 def test_close_reads_no_node_and_closes_once(

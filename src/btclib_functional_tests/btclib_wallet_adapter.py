@@ -216,10 +216,11 @@ class BtclibWallet:
         It is no part of `wallet.WalletAdapter`, as `BitcoindWallet.rpc`
         is not. A call through it gets no sync.
 
-        :raises ValueError: the wallet is unloaded.
+        :raises ValueError: the wallet is unloaded; the message leaves out
+            its name, which a caller may have given at any length.
         """
         if self._ledger is None:
-            err_msg = f"wallet {self._name} is unloaded"
+            err_msg = "the wallet is unloaded"
             raise ValueError(err_msg)
         return self._ledger
 
@@ -304,13 +305,16 @@ class BtclibWallet:
         # `Psbt.from_tx` empties the inputs of the transaction it is given
         unsigned = Tx.parse(tx.serialize(include_witness=False, check_validity=False))
         ledger = self._synced()
+        refusal: ValueError
         try:
             final = finalize(ledger.sign(Psbt.from_tx(unsigned)))
         except BTClibValueError:
-            err_msg = "inputs left unsigned"
-            raise ValueError(err_msg) from None
-        # no fee ceiling: `signrawtransactionwithwallet` checks no fee
-        return tx_for_network(extract_tx(final, max_fee_rate=None), self.network)
+            refusal = ValueError("inputs left unsigned")
+        else:
+            # no fee ceiling: `signrawtransactionwithwallet` checks no fee
+            return tx_for_network(extract_tx(final, max_fee_rate=None), self.network)
+        # raised here, outside the `except` block, so it chains no ledger error
+        raise refusal
 
     @property
     def network(self) -> str:
