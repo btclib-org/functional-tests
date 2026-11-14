@@ -173,12 +173,31 @@ def _held(ledger: Ledger, txid: bytes, refused: str) -> LedgerTxInfo:
     raise refusal
 
 
+def _removed(path: Path) -> str:
+    """Remove `path`; return what a refusal adds where that fails.
+
+    The type of the `OSError` alone: its text and `filename` hold the path.
+    """
+    failure = ""
+    try:
+        path.unlink()
+    except OSError as exc:
+        failure = f", its file not removed: {type(exc).__name__}"
+    return failure
+
+
 class BtclibWallet:
     """One ledger of btclib-wallet, as `wallet.WalletAdapter` drives it.
 
     Made in a new file at `path`, holding the module docstring's one
     source, born at the height `backend` reads. Where making it fails,
-    no file is left at `path`, so a wallet made next can take that path.
+    its file is removed, so a wallet made next can take that path.
+
+    A refusal to make, load or unload the wallet names the type of what
+    failed, and neither the wallet's name nor its path, which holds the
+    name: section 7's *A refusal carries no secret* of the organization's
+    standard quotes a name only up to 16 characters. It is raised outside
+    the handler, so it chains nothing.
     """
 
     def __init__(
@@ -191,13 +210,20 @@ class BtclibWallet:
         self._ledger: Ledger | None = None
         source = _new_source(self.network)
         height = backend.get_block_count()
-        self._open(create=True)
+        ledger = self._opened(create=True)
+        self._ledger = ledger
         try:
-            self.ledger.add_source(source, height)
-        except BaseException:
-            self.close()
-            path.unlink()
-            raise
+            ledger.add_source(source, height)
+        except BaseException as exc:  # noqa: BLE001 - named by type below
+            failure = exc
+        else:
+            return
+        self.close()
+        left = _removed(path)
+        if not isinstance(failure, Exception):
+            raise failure
+        err_msg = f"wallet not created: {type(failure).__name__}{left}"
+        raise ValueError(err_msg)
 
     @property
     def node(self) -> NodeAdapter:
@@ -224,17 +250,29 @@ class BtclibWallet:
             raise ValueError(err_msg)
         return self._ledger
 
-    def _open(self, *, create: bool) -> None:
-        """Make the ledger's file, or open it again."""
+    def _opened(self, *, create: bool) -> Ledger:
+        """Return the ledger of a new file, or of the file opened again.
+
+        :raises ValueError: btclib-wallet refused the file; the message
+            names the exception's type alone.
+        """
         opener = Ledger.create if create else Ledger.load
-        self._ledger = opener(
-            self._path,
-            network_of(self._node),
-            self._backend,
-            broadcaster=self._backend,
-            relay_fee_reader=self._backend,
-            fallback_fee_rate=FALLBACK_FEE_RATE,
-        )
+        refusal: ValueError
+        try:
+            return opener(
+                self._path,
+                network_of(self._node),
+                self._backend,
+                broadcaster=self._backend,
+                relay_fee_reader=self._backend,
+                fallback_fee_rate=FALLBACK_FEE_RATE,
+            )
+        # any failure on the file can quote its path
+        except Exception as exc:  # noqa: BLE001
+            verb = "created" if create else "loaded"
+            refusal = ValueError(f"wallet not {verb}: {type(exc).__name__}")
+        # raised here, outside the `except` block, so it chains nothing
+        raise refusal
 
     def _synced(self) -> Ledger:
         """Return the ledger, once it has read what its node holds."""
@@ -392,8 +430,15 @@ class BtclibWallet:
         self._ledger = None
 
     def load(self) -> None:
-        """Open the ledger's file again."""
-        self._open(create=False)
+        """Open the ledger's file again.
+
+        :raises ValueError: the wallet is loaded, or btclib-wallet refused
+            the file.
+        """
+        if self._ledger is not None:
+            err_msg = "the wallet is already loaded"
+            raise ValueError(err_msg)
+        self._ledger = self._opened(create=False)
 
     def close(self) -> None:
         """Close the ledger where it is open, reading no node.

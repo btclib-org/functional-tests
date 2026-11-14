@@ -13,6 +13,7 @@ there.
 from __future__ import annotations
 
 import hashlib
+from pathlib import Path
 from typing import TYPE_CHECKING, cast, override
 
 import pytest
@@ -54,8 +55,7 @@ from btclib_functional_tests.wallet import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Iterator
-    from pathlib import Path
+    from collections.abc import Callable, Iterable, Iterator
 
     from btclib.alias import Octets
 
@@ -267,24 +267,115 @@ def test_a_wallet_not_made_leaves_no_file(tmp_path: Path) -> None:
     factory.close()
 
 
+def _refused_source(
+    failure: BaseException,
+) -> Callable[..., int]:
+    """Return an `add_source` that raises `failure`."""
+
+    def refuse(*_: object) -> int:
+        raise failure
+
+    return refuse
+
+
 def test_a_source_not_added_leaves_no_file(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The ledger is closed and its file removed, so the path is free."""
+    """The ledger is closed and its file removed, so the path is free.
+
+    The refusal names the failure's type, and neither the name, here a
+    key given by mistake, nor the path that holds it.
+    """
     chain = _Chain()
     factory = BtclibWalletFactory(tmp_path, lambda _: chain)
     node = cast("NodeAdapter", _Node())
+    with monkeypatch.context() as patched:
+        patched.setattr(Ledger, "add_source", _refused_source(RuntimeError(_WIF)))
+        with pytest.raises(
+            ValueError, match="^wallet not created: RuntimeError$"
+        ) as excinfo:
+            factory.create(node, _WIF)
+    _assert_secret_free(excinfo.value, _WIF)
+    assert not list(tmp_path.iterdir())
+    assert factory.create(node, _WIF).name == _WIF
+    factory.close()
 
-    def refuse(*_: object) -> int:
-        err_msg = "no source"
-        raise RuntimeError(err_msg)
+
+def test_a_file_not_removed_is_named_by_its_error_s_type(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The `OSError` of the removal quotes the path: its type is named alone."""
+    chain = _Chain()
+    factory = BtclibWalletFactory(tmp_path, lambda _: chain)
+
+    def held(self: Path, *_: object) -> None:
+        raise PermissionError(13, "Permission denied", str(self))
 
     with monkeypatch.context() as patched:
-        patched.setattr(Ledger, "add_source", refuse)
-        with pytest.raises(RuntimeError, match="no source"):
-            factory.create(node, "w")
+        patched.setattr(Ledger, "add_source", _refused_source(RuntimeError()))
+        patched.setattr(Path, "unlink", held)
+        with pytest.raises(
+            ValueError,
+            match="^wallet not created: RuntimeError, its file not removed: "
+            "PermissionError$",
+        ) as excinfo:
+            factory.create(cast("NodeAdapter", _Node()), _WIF)
+    _assert_secret_free(excinfo.value, _WIF)
+    factory.close()
+
+
+def test_an_interrupt_while_a_wallet_is_made_removes_its_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An exception that is no `Exception` is raised as it is."""
+    chain = _Chain()
+    factory = BtclibWalletFactory(tmp_path, lambda _: chain)
+    with monkeypatch.context() as patched:
+        patched.setattr(Ledger, "add_source", _refused_source(KeyboardInterrupt()))
+        with pytest.raises(KeyboardInterrupt):
+            factory.create(cast("NodeAdapter", _Node()), "w")
     assert not list(tmp_path.iterdir())
-    assert factory.create(node, "w").name == "w"
+
+
+def test_a_second_wallet_at_one_path_names_no_path(tmp_path: Path) -> None:
+    """Another factory's wallet of the same name in the same directory."""
+    chain = _Chain()
+    first = BtclibWalletFactory(tmp_path, lambda _: chain)
+    second = BtclibWalletFactory(tmp_path, lambda _: chain)
+    node = cast("NodeAdapter", _Node())
+    first.create(node, _WIF)
+    with pytest.raises(
+        ValueError, match="^wallet not created: BTClibValueError$"
+    ) as excinfo:
+        second.create(node, _WIF)
+    _assert_secret_free(excinfo.value, _WIF)
+    first.close()
+
+
+def test_a_loaded_wallet_is_not_loaded_again(tmp_path: Path) -> None:
+    """The refusal names neither the wallet nor its file."""
+    chain = _Chain()
+    factory = BtclibWalletFactory(tmp_path, lambda _: chain)
+    wallet = factory.create(cast("NodeAdapter", _Node()), _WIF)
+    with pytest.raises(ValueError, match="^the wallet is already loaded$") as excinfo:
+        wallet.load()
+    _assert_secret_free(excinfo.value, _WIF)
+    factory.close()
+
+
+def test_a_file_the_ledger_refuses_is_named_by_its_error_s_type(
+    tmp_path: Path,
+) -> None:
+    """A file gone while the wallet is unloaded: its path is not quoted."""
+    chain = _Chain()
+    factory = BtclibWalletFactory(tmp_path, lambda _: chain)
+    wallet = factory.create(cast("NodeAdapter", _Node()), _WIF)
+    wallet.unload()
+    for path in tmp_path.iterdir():
+        path.unlink()
+    with pytest.raises(ValueError, match="^wallet not loaded: ") as excinfo:
+        wallet.load()
+    _assert_secret_free(excinfo.value, _WIF)
     factory.close()
 
 
