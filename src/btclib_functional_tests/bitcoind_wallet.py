@@ -79,6 +79,27 @@ def _shape(answer: object) -> str:
     return f"a {type(answer).__name__}"
 
 
+def _txid_hex(txid: object) -> str:
+    """Return `txid` in hex, refusing all but 32 bytes before Core sees it.
+
+    Core's `ParseHashV` refuses any other string with a message that quotes
+    it (`src/rpc/util.cpp`, bitcoin/bitcoin@f0de87f040, the v32.1 tag), and
+    a key given by mistake as an id would be printed. Of a 32-byte id,
+    `gettransaction`, `lockunspent` and `abandontransaction` quote nothing.
+    The refusal names the type and the length alone, as `_shape` does.
+
+    :raises TypeError: `txid` is not bytes.
+    :raises ValueError: `txid` is not 32 bytes.
+    """
+    if not isinstance(txid, bytes):
+        err_msg = f"not a transaction id: {_shape(txid)}"
+        raise TypeError(err_msg)
+    if len(txid) != 32:
+        err_msg = f"not a transaction id: {_shape(txid)}"
+        raise ValueError(err_msg)
+    return txid.hex()
+
+
 def _sats(amount: object) -> int:
     """Return an RPC amount, a `Decimal` of bitcoin, in satoshi."""
     if not isinstance(amount, Decimal):
@@ -256,8 +277,13 @@ class BitcoindWallet:
         `abandoned` on each entry of `details`, so a transaction with no
         entry reads as not abandoned. Each output carries the node's
         chain, `network`.
+
+        :raises TypeError: `txid` is not bytes (`_txid_hex`).
+        :raises ValueError: `txid` is not 32 bytes (`_txid_hex`).
         """
-        answer = _dict(self._call("gettransaction", [txid.hex()]), "gettransaction")
+        answer = _dict(
+            self._call("gettransaction", [_txid_hex(txid)]), "gettransaction"
+        )
         tx = _on_chain(Tx.parse(bytes.fromhex(str(answer["hex"]))), self.network)
         details = answer["details"]
         conflicts = answer["walletconflicts"]
@@ -352,11 +378,13 @@ class BitcoindWallet:
         raise refusal
 
     def lock(self, outpoint: OutPoint) -> None:
-        """Lock the output with `lockunspent`."""
-        self._call(
-            "lockunspent",
-            [False, [{"txid": outpoint.tx_id.hex(), "vout": outpoint.vout}]],
-        )
+        """Lock the output with `lockunspent`.
+
+        :raises TypeError: its `tx_id` is not bytes (`_txid_hex`).
+        :raises ValueError: its `tx_id` is not 32 bytes (`_txid_hex`).
+        """
+        txid = _txid_hex(outpoint.tx_id)
+        self._call("lockunspent", [False, [{"txid": txid, "vout": outpoint.vout}]])
 
     def abandon(self, txid: bytes) -> None:
         """Abandon the transaction with `abandontransaction`.
@@ -366,9 +394,12 @@ class BitcoindWallet:
             block or the mempool and one not the wallet's. The message
             names the code and not the transaction, by section 7's *A
             refusal carries no secret* of the organization's standard.
+            Before Core sees it, an id that is not 32 bytes is refused
+            too, and one that is not bytes raises `TypeError` (`_txid_hex`).
         """
+        hex_txid = _txid_hex(txid)
         try:
-            self._call("abandontransaction", [txid.hex()])
+            self._call("abandontransaction", [hex_txid])
         except RpcError as exc:
             if exc.code != _RPC_INVALID_ADDRESS_OR_KEY:
                 raise

@@ -12,7 +12,7 @@ real bitcoind, without starting one.
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from decimal import Decimal
 from typing import TYPE_CHECKING, cast
 
@@ -547,6 +547,54 @@ def test_lock_is_lockunspent_of_the_output() -> None:
         _SYNC,
         (_NAME, "lockunspent", [False, [{"txid": _TXID, "vout": 3}]]),
     ]
+
+
+# a private key as a 33-byte payload, `00 || k`, and as WIF bytes: each
+# passed by mistake where a transaction id belongs
+_KEY_PAYLOAD = b"\x00" + (7).to_bytes(32, "big")
+_WIF_BYTES = _WIF.encode()
+
+
+def _spellings(secret: bytes) -> tuple[str, ...]:
+    """Return what a refusal could print of `secret`."""
+    spellings = (secret.hex(), secret[::-1].hex(), repr(secret))
+    return (*spellings, _WIF) if secret == _WIF_BYTES else spellings
+
+
+def _refusals(wallet: BitcoindWallet, txid: bytes) -> list[ValueError]:
+    """Return the refusal of each method that sends a transaction id."""
+    calls: list[Callable[[], object]] = [
+        lambda: wallet.transaction(txid),
+        lambda: wallet.lock(OutPoint(txid, 0, check_validity=False)),
+        lambda: wallet.abandon(txid),
+    ]
+    refusals = []
+    for call in calls:
+        with pytest.raises(ValueError, match="^not a transaction id: ") as excinfo:
+            call()
+        refusals.append(excinfo.value)
+    return refusals
+
+
+@pytest.mark.parametrize("key", [_KEY_PAYLOAD, _WIF_BYTES], ids=["payload", "wif"])
+def test_an_id_not_of_32_bytes_is_refused_before_core_sees_it(key: bytes) -> None:
+    """Core's `ParseHashV` would quote it; the refusal gives its length."""
+    wallet, node = _wallet()
+    for refusal in _refusals(wallet, key):
+        assert str(refusal) == f"not a transaction id: a bytes of length {len(key)}"
+        _assert_no_key(refusal, _spellings(key))
+    assert node.calls == []
+
+
+def test_an_id_not_of_bytes_is_refused_before_core_sees_it() -> None:
+    """A WIF string names its type and length alone."""
+    wallet, node = _wallet()
+    with pytest.raises(
+        TypeError, match="^not a transaction id: a str of length 52$"
+    ) as excinfo:
+        wallet.abandon(cast("bytes", _WIF))
+    _assert_no_key(excinfo.value)
+    assert node.calls == []
 
 
 def test_abandon_is_abandontransaction() -> None:
