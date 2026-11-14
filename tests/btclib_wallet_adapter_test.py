@@ -21,6 +21,7 @@ from btclib.b58 import wif_from_prv_key
 from btclib.fee import FeeRate
 from btclib.key import PrvKeyData
 from btclib.script import ScriptPubKey
+from btclib.script.witness import Witness
 from btclib.tx import OutPoint, Tx, TxIn, TxOut
 from btclib_wallet.descriptors.descriptors import add_checksum
 from btclib_wallet.exceptions import FetchError
@@ -369,6 +370,20 @@ def test_sign_refuses_an_input_it_cannot_sign(
     with pytest.raises(ValueError, match="^inputs left unsigned$") as excinfo:
         wallet.sign(tx)
     assert excinfo.value.__cause__ is None
+
+
+def test_sign_refuses_an_input_another_party_signed(
+    funded: tuple[BtclibWallet, _Chain, Tx],
+) -> None:
+    """Its signature is not kept: the ledger holds no output it spends."""
+    wallet, _, payment = funded
+    signed_elsewhere = TxIn(
+        OutPoint(b"\x03" * 32, 0), script_witness=Witness([b"\x30" * 71, b"\x02" * 33])
+    )
+    out = TxOut(_VALUE // 2, ScriptPubKey.from_address(_ADDRESS))
+    tx = Tx(2, 0, [TxIn(OutPoint(payment.id, 0)), signed_elsewhere], [out])
+    with pytest.raises(ValueError, match="^inputs left unsigned$"):
+        wallet.sign(tx)
 
 
 def test_an_imported_descriptor_makes_its_payments_the_wallet_s(

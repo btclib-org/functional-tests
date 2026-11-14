@@ -35,7 +35,11 @@ What differs from bitcoind's wallet here is the ledger's:
   resubmits its own on load (`Ledger.resubmit`'s docstring);
 - a descriptor imported with a WIF is watch-only: btclib-wallet's
   descriptor parser keeps the private key of an extended key, and of no
-  other (`descriptors.parse`).
+  other (`descriptors.parse`);
+- `sign` refuses an input spending no output of the ledger's, even where
+  the transaction already signs it: `Ledger.sign` needs each input's
+  previous output, and Core's wallet reads one it does not hold from its
+  node ([ISS 651](https://github.com/btclib-org/functional-tests/issues/651)).
 """
 
 from __future__ import annotations
