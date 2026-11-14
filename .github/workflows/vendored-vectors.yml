@@ -75,6 +75,8 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Setup uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
       # --dry-run on everything but the schedule trigger, the same
       # guarantee reusable-vendored-vectors.yml's own job gives: a pull
       # request or a dispatch testing a change to this script or to the
@@ -89,7 +91,7 @@ jobs:
           if [ -n "$DRY_RUN" ]; then
             args=(--dry-run)
           fi
-          python3 .github/scripts/tf2_ledger_census.py \
+          uv run --no-project python .github/scripts/tf2_ledger_census.py \
             TF2.md "test_framework has files TF2.md has no entry for" \
             "TF2.md per-test rows behind upstream" \
             "${args[@]}"

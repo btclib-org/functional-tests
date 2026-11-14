@@ -75,8 +75,8 @@ comfortable with agentic development ;-). A contribution must have been
 read and understood by the person who submits it.
 [`CONTRIBUTING.md`](./CONTRIBUTING.md#working-with-an-llm) has the rules.
 
-[CONTRIBUTING.md](./CONTRIBUTING.md) also has the commands each CI job runs,
-verbatim. [REVIEWING.md](./REVIEWING.md) is what a pull request is
+[CONTRIBUTING.md](./CONTRIBUTING.md) also has the commands that reproduce
+what CI runs. [REVIEWING.md](./REVIEWING.md) is what a pull request is
 answered against. How the organization decides, and who holds which
 role, is its
 [GOVERNANCE.md](https://github.com/btclib-org/.github/blob/main/GOVERNANCE.md);

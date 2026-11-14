@@ -573,7 +573,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          python3 .github/scripts/tf2_master_verdict.py \
+          uv run --no-project python .github/scripts/tf2_master_verdict.py \
             TF2.md ../master.xml ../pinned-report/integration.xml \
             >> "$GITHUB_STEP_SUMMARY"
 

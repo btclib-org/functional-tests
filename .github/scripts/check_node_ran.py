@@ -30,7 +30,8 @@ Every other skip -- no `btclib_node` importable, no `bitcoind`,
 fails the run. A capability's skip does not: the fixture that found the
 node importable has already run by the time a test asks for one.
 
-    python .github/scripts/check_node_ran.py integration.xml
+    uv run --locked --no-default-groups --group test \
+        python .github/scripts/check_node_ran.py integration.xml
 """
 
 from __future__ import annotations

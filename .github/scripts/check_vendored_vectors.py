@@ -71,7 +71,7 @@ carries but this script did not check is listed in its own report, so
 nothing silently reads as "checked and clean" that was not checked at
 all.
 
-    python .github/scripts/check_vendored_vectors.py \
+    uv run --no-project python .github/scripts/check_vendored_vectors.py \
         TF2.md "TF2.md pins behind upstream"
 """
 
