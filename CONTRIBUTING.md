@@ -678,8 +678,8 @@ read by every checkout of this repository.
 
 ### Reproducing what CI runs
 
-Each command below is the one a CI job runs. Keep this section true when a
-workflow changes.
+Each command below reproduces locally what a CI job runs. Keep this
+section true when a workflow changes.
 
 `test.yml`, the `coverage` job:
 
@@ -742,12 +742,17 @@ ledger in both directions, then compares each per-test pin with its
 path's tip:
 
 ```shell
-python .github/scripts/check_vendored_vectors.py \
+uv run --no-project python .github/scripts/check_vendored_vectors.py \
     TF2.md "TF2.md pins behind upstream" --dry-run
-python .github/scripts/tf2_ledger_census.py \
+uv run --no-project python .github/scripts/tf2_ledger_census.py \
     TF2.md "test_framework has files TF2.md has no entry for" \
     "TF2.md per-test rows behind upstream" --dry-run
 ```
+
+Both scripts take the standard library alone and shell out to `gh`, so
+`--no-project` runs them without syncing the project. The `vectors`
+job's own line, in btclib-org/.github's `reusable-vendored-vectors.yml`,
+runs the first on the interpreter setup-python installs, not through uv.
 
 `codeql.yml` has no line here: this repository does not carry it yet.
 
@@ -773,7 +778,8 @@ release. Each of the two compares its JUnit report with `TF2.md`'s
 gives:
 
 ```shell
-python .github/scripts/btclib_node_verdict.py \
+uv run --locked --no-default-groups --group test \
+    python .github/scripts/btclib_node_verdict.py \
     TF2.md integration.xml release
 ```
 

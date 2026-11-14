@@ -86,7 +86,7 @@ the whole report: the workflow step redirects it into `$GITHUB_STEP_SUMMARY`
 rather than this script writing there itself, matching neither of the
 two scripts beside it needing to know the runner is there at all.
 
-    python .github/scripts/tf2_master_verdict.py \
+    uv run --no-project python .github/scripts/tf2_master_verdict.py \
         TF2.md master.xml pinned.xml
 """
 

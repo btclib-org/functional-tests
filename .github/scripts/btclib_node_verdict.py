@@ -75,7 +75,8 @@ each move is a cell of `TF2.md` no longer describing that build, and a
 green step then means the whole column does. This writes to stdout
 alone, and the workflow step copies it into `$GITHUB_STEP_SUMMARY`:
 
-    python .github/scripts/btclib_node_verdict.py \
+    uv run --locked --no-default-groups --group test \
+        python .github/scripts/btclib_node_verdict.py \
         TF2.md integration.xml release
 """
 

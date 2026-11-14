@@ -31,7 +31,7 @@ and from `check_vendored_vectors.py`'s per-pin drift title, so a gained
 file, a stale framework pin and a stale per-test pin are never the same
 issue and one report never overwrites another.
 
-    python .github/scripts/tf2_ledger_census.py TF2.md \
+    uv run --no-project python .github/scripts/tf2_ledger_census.py TF2.md \
         "test_framework has files TF2.md has no entry for" \
         "TF2.md per-test rows behind upstream"
 """
