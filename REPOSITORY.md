@@ -65,15 +65,15 @@ git push git@github.com:btclib-org/functional-tests.git main
 
 Then the switches section 11 turns off or on at the repository level, in
 one call — the projects board and the wiki off, the tracker on, squash as
-the only merge method with auto-merge, the head branch deleted on merge,
-and the squash commit's title and body — together with the `.homepage`,
-section 3's page on btclib.org:
+the only merge method, the head branch deleted on merge, and the squash
+commit's title and body — together with the `.homepage`, section 3's page
+on btclib.org:
 
 ```shell
 gh api -X PATCH repos/btclib-org/functional-tests \
   -F has_issues=true -F has_wiki=false -F has_projects=false \
   -F allow_squash_merge=true -F allow_merge_commit=false \
-  -F allow_rebase_merge=false -F allow_auto_merge=true \
+  -F allow_rebase_merge=false -F allow_auto_merge=false \
   -F delete_branch_on_merge=true \
   -f squash_merge_commit_title=COMMIT_OR_PR_TITLE \
   -f squash_merge_commit_message=COMMIT_MESSAGES \
@@ -365,20 +365,22 @@ lightweight, so the rule does not check a tag's signature
 ## Merge methods
 
 **Squash is the only method GitHub can be asked for**, and auto-merge
-presses it once the review and the checks are in; the call is the one
-under *Creating the repository*. Read back:
+is off, so no pull request can be armed; the call is the one under
+*Creating the repository*. Read back:
 
 ```shell
 gh api repos/btclib-org/functional-tests \
   --jq '{allow_squash_merge, allow_merge_commit, allow_rebase_merge,
          allow_auto_merge, squash_merge_commit_title,
          squash_merge_commit_message, delete_branch_on_merge}'
-# {"allow_auto_merge":true,"allow_merge_commit":false,
+# {"allow_auto_merge":false,"allow_merge_commit":false,
 #  "allow_rebase_merge":false,"allow_squash_merge":true,
 #  "delete_branch_on_merge":true,
 #  "squash_merge_commit_message":"COMMIT_MESSAGES",
 #  "squash_merge_commit_title":"COMMIT_OR_PR_TITLE"}
 ```
+
+Read on 2026-11-14T15:29Z.
 
 `COMMIT_OR_PR_TITLE` is the subject: the pull request title with its
 number, or the subject of the single commit where a branch has one.
