@@ -278,6 +278,11 @@ def _refused_source(
     return refuse
 
 
+def _unremovable(self: Path, *_: object) -> None:
+    """Stand in for `Path.unlink` where the file system refuses it."""
+    raise PermissionError(13, "Permission denied", str(self))
+
+
 def test_a_source_not_added_leaves_no_file(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -307,13 +312,9 @@ def test_a_file_not_removed_is_named_by_its_error_s_type(
     """The `OSError` of the removal quotes the path: its type is named alone."""
     chain = _Chain()
     factory = BtclibWalletFactory(tmp_path, lambda _: chain)
-
-    def held(self: Path, *_: object) -> None:
-        raise PermissionError(13, "Permission denied", str(self))
-
     with monkeypatch.context() as patched:
         patched.setattr(Ledger, "add_source", _refused_source(RuntimeError()))
-        patched.setattr(Path, "unlink", held)
+        patched.setattr(Path, "unlink", _unremovable)
         with pytest.raises(
             ValueError,
             match="^wallet not created: RuntimeError, its file not removed: "
@@ -332,9 +333,25 @@ def test_an_interrupt_while_a_wallet_is_made_removes_its_file(
     factory = BtclibWalletFactory(tmp_path, lambda _: chain)
     with monkeypatch.context() as patched:
         patched.setattr(Ledger, "add_source", _refused_source(KeyboardInterrupt()))
-        with pytest.raises(KeyboardInterrupt):
+        with pytest.raises(KeyboardInterrupt) as excinfo:
             factory.create(cast("NodeAdapter", _Node()), "w")
+    assert not hasattr(excinfo.value, "__notes__")
     assert not list(tmp_path.iterdir())
+
+
+def test_an_interrupt_notes_a_file_not_removed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The interrupt is raised as it is, with a note naming the error's type."""
+    chain = _Chain()
+    factory = BtclibWalletFactory(tmp_path, lambda _: chain)
+    with monkeypatch.context() as patched:
+        patched.setattr(Ledger, "add_source", _refused_source(KeyboardInterrupt()))
+        patched.setattr(Path, "unlink", _unremovable)
+        with pytest.raises(KeyboardInterrupt) as excinfo:
+            factory.create(cast("NodeAdapter", _Node()), _WIF)
+    assert excinfo.value.__notes__ == ["its file not removed: PermissionError"]
+    _assert_secret_free(excinfo.value, _WIF)
 
 
 def test_a_second_wallet_at_one_path_names_no_path(tmp_path: Path) -> None:

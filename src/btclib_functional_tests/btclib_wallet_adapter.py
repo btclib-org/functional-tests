@@ -173,31 +173,34 @@ def _held(ledger: Ledger, txid: bytes, refused: str) -> LedgerTxInfo:
     raise refusal
 
 
-def _removed(path: Path) -> str:
-    """Remove `path`; return what a refusal adds where that fails.
+def _removed(path: Path) -> str | None:
+    """Remove `path`; where that fails, say so by the `OSError`'s type.
 
-    The type of the `OSError` alone: its text and `filename` hold the path.
+    The type alone: the error's text and `filename` hold the path.
     """
-    failure = ""
     try:
         path.unlink()
     except OSError as exc:
-        failure = f", its file not removed: {type(exc).__name__}"
-    return failure
+        return f"its file not removed: {type(exc).__name__}"
+    return None
 
 
 class BtclibWallet:
     """One ledger of btclib-wallet, as `wallet.WalletAdapter` drives it.
 
     Made in a new file at `path`, holding the module docstring's one
-    source, born at the height `backend` reads. Where making it fails,
-    its file is removed, so a wallet made next can take that path.
+    source, born at the height `backend` reads. Where adding that source
+    fails, the file is closed and removed, so a wallet made next can take
+    that path. Where the removal fails too, the file stays, and what is
+    raised says so: a refusal in its text, and an exception that is no
+    `Exception`, such as an interrupt, in a note.
 
-    A refusal to make, load or unload the wallet names the type of what
-    failed, and neither the wallet's name nor its path, which holds the
-    name: section 7's *A refusal carries no secret* of the organization's
-    standard quotes a name only up to 16 characters. It is raised outside
-    the handler, so it chains nothing.
+    Where btclib-wallet or the file system refuses the file, to make,
+    load or remove it, the refusal names the type of that failure, and
+    neither the wallet's name nor its path, which holds the name: section
+    7's *A refusal carries no secret* of the organization's standard
+    quotes a name only up to 16 characters. It is raised outside the
+    handler, so it chains nothing.
     """
 
     def __init__(
@@ -221,9 +224,11 @@ class BtclibWallet:
         self.close()
         left = _removed(path)
         if not isinstance(failure, Exception):
+            if left is not None:
+                failure.add_note(left)
             raise failure
-        err_msg = f"wallet not created: {type(failure).__name__}{left}"
-        raise ValueError(err_msg)
+        refused = [f"wallet not created: {type(failure).__name__}", left]
+        raise ValueError(", ".join(part for part in refused if part is not None))
 
     @property
     def node(self) -> NodeAdapter:
