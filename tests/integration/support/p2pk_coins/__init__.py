@@ -9,9 +9,6 @@ Core builds a transaction whose txid is its wtxid with a
 `RAW_P2PK_SCRIPT_PUB_KEY` on a node, and `p2pk_tx`, `p2pk_self_transfer`
 and `p2pk_self_transfer_multi` spend them under `raw_p2pk_script_sig`
 (`mini_wallet.py`), which `MiniWallet` does not.
-
-This module holds no test: its name ends `_test` for the repository's
-`name-tests-test` hook.
 """
 
 from __future__ import annotations

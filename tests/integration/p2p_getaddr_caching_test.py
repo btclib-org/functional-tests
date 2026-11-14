@@ -25,7 +25,7 @@ it is given. Core's loopback bind is its framework's own `bind=127.0.0.1`
 onion binds its test names keep `TestNode.start` from adding its own
 (`test_framework/test_node.py`). An adapter's own `_command` may name a
 `-bind` too, so the node is built from the class the caller passes,
-`UnboundBitcoindAdapter` (`support/bitcoind_adapters.py`) for bitcoind leaving
+`UnboundBitcoindAdapter` (`support/bitcoind_adapters/`) for bitcoind leaving
 it out, and all three binds are named here. Core's ports come from
 `p2p_port`, unprobed; here all three come from `free_ports`.
 

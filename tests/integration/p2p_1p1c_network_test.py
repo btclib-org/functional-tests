@@ -61,7 +61,7 @@ version with the new rule, so the body fails against such a build.
 What differs from Core's file:
 
 - Core's second wallet is a `MiniWalletMode.RAW_P2PK` one on the third
-  node: here `mine_p2pk_coins` (`support/p2pk_coins.py`) mines, on that
+  node: here `mine_p2pk_coins` (`support/p2pk_coins/`) mines, on that
   node, coinbases paying `RAW_P2PK_SCRIPT_PUB_KEY`, and
   `raw_p2pk_script_sig` (`mini_wallet.py`) signs every spend of one,
   every input signed under btclib's deterministic nonce where Core's

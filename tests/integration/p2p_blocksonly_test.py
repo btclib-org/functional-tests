@@ -32,7 +32,7 @@ Every body mines a coin to spend first (`Capability.MINE`,
 
 Core's `P2PInterface` asks for whatever a node announces, and its
 `P2PTxInvStore` records the announced transactions, from its framework's
-network thread. Here `RelayConn` (`support/p2p_conns.py`) does both on the
+network thread. Here `RelayConn` (`support/p2p_conns/`) does both on the
 test's own thread, where a wait reads the peer's connection: a check
 that a peer was not announced a transaction reads it up to the `pong`
 answering the second of two `ping`s, the node running its own send loop

@@ -72,7 +72,7 @@ below builds one the way Core's `HeaderAndShortIDs.initialize_from_block`
 does at `use_witness=True`.
 
 Core's `TestP2PConn` records what the node sends from its framework's
-network thread. Here `_BlockConn`, a `Conn` (`support/p2p_conns.py`), does so
+network thread. Here `_BlockConn`, a `Conn` (`support/p2p_conns/`), does so
 on the test's own thread, where a wait reads the peer's connection: a
 wait reads the peer up to the `pong` of a ping round trip ahead of every
 poll, and a check that the node sent nothing reads it up to that `pong`

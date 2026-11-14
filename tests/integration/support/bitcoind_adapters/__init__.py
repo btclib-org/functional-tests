@@ -5,9 +5,6 @@
 """`BitcoindAdapter` subclasses for `*_bitcoind_test.py` modules.
 
 A module hands one to the test body it runs.
-
-This module holds no test: its name ends `_test` for the repository's
-`name-tests-test` hook.
 """
 
 from __future__ import annotations

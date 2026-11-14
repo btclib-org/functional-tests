@@ -45,7 +45,7 @@ mines a block first (`Capability.MINE`), and a body spending a coin mines
 it the same way (`mini_wallet.MiniWallet`).
 
 Core's `TestP2PConn` counts each `getdata` for a transaction from its
-framework's network thread. Here `_TxConn`, a `Conn` (`support/p2p_conns.py`),
+framework's network thread. Here `_TxConn`, a `Conn` (`support/p2p_conns/`),
 counts it on the test's own thread, where the test reads the peer's
 connection: a wait for a request reads each peer it names up to the
 `pong` of a ping round trip ahead of every poll, the node sending that
