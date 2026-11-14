@@ -64,6 +64,7 @@ from btclib_wallet.fetch.fetcher import tx_for_network
 from btclib_wallet.fetch.history import ScriptHistory
 from btclib_wallet.fetch.relay_fees import RelayFees
 from btclib_wallet.ledger import Ledger, TxState
+from btclib_wallet.ledger import TxInfo as LedgerTxInfo
 from btclib_wallet.psbt.psbt import Psbt, extract_tx, finalize
 from btclib_wallet.wallet.descriptor_wallet import DescriptorWallet
 
@@ -151,6 +152,25 @@ def _new_source(network: str) -> DescriptorWallet:
     coin_type = 0 if network == "mainnet" else 1
     descriptor = add_checksum(f"wpkh({xprv}/84h/{coin_type}h/0h/<0;1>/*)")
     return DescriptorWallet.from_descriptor(descriptor, network, {})
+
+
+def _held(ledger: Ledger, txid: bytes, refused: str) -> LedgerTxInfo:
+    """Return `Ledger.transaction`'s answer, refusing with `refused` alone.
+
+    The ledger's refusal quotes the id, which section 7's *A refusal
+    carries no secret* of the organization's standard counts as a secret
+    where a caller passed one by mistake
+    ([ISS btclib-org/btclib-wallet#821](https://github.com/btclib-org/btclib-wallet/issues/821)).
+
+    :raises ValueError: the transaction is not the ledger's.
+    """
+    refusal: ValueError
+    try:
+        return ledger.transaction(txid)
+    except BTClibValueError:
+        refusal = ValueError(refused)
+    # raised here, outside the `except` block, so it chains no ledger error
+    raise refusal
 
 
 class BtclibWallet:
@@ -258,7 +278,7 @@ class BtclibWallet:
 
         :raises ValueError: the transaction is not the wallet's.
         """
-        info = self._synced().transaction(txid)
+        info = _held(self._synced(), txid, "not a transaction of the wallet")
         return TxInfo(
             info.wallet_tx.tx,
             info.trusted,
@@ -340,9 +360,22 @@ class BtclibWallet:
     def abandon(self, txid: bytes) -> None:
         """Abandon the transaction with `Ledger.abandon`.
 
-        :raises ValueError: the ledger refused it.
+        :raises ValueError: the transaction is not the wallet's, or the
+            ledger refused it, the message then naming its state.
         """
-        self._synced().abandon(txid)
+        ledger = self._synced()
+        refused = "not abandoned: not a transaction of the wallet"
+        state = _held(ledger, txid, refused).wallet_tx.state
+        refusal: ValueError
+        try:
+            ledger.abandon(txid)
+        except BTClibValueError:
+            refusal = ValueError(f"not abandoned: a {state.value} transaction")
+        else:
+            return
+        # raised here, outside the `except` block, so it chains no ledger
+        # error, whose text quotes the id
+        raise refusal
 
     def unload(self) -> None:
         """Close the ledger and its file, once it has read its node.

@@ -73,6 +73,25 @@ _FLOOR = FeeRate(sats_per_kvbyte=1_000)
 _ADDRESS = ScriptPubKey.p2wpkh(PrvKeyData(11, network="regtest").pub).address
 
 
+# a private key, passed by mistake where a transaction id belongs
+_KEY = (7).to_bytes(32, "big")
+
+
+def _assert_secret_free(exc: BaseException, secret: bytes) -> None:
+    """Assert `secret` is in no text, argument or attribute of `exc`.
+
+    Each spelling a refusal could print is asked, and `exc` chains nothing:
+    `__context__` is asked as well as `__cause__`, since `raise ... from
+    None` hides the first from a traceback and keeps it.
+    """
+    for spelling in (secret.hex(), secret[::-1].hex(), repr(secret)):
+        assert spelling not in str(exc)
+        assert all(spelling not in repr(arg) for arg in exc.args)
+        assert all(spelling not in repr(value) for value in vars(exc).values())
+    assert exc.__cause__ is None
+    assert exc.__context__ is None
+
+
 def _block_id(height: int) -> bytes:
     """Return the id of the block at `height` of the chain in memory."""
     return hashlib.sha256(height.to_bytes(4, "big")).digest()
@@ -303,10 +322,25 @@ def test_a_payment_counts_in_every_read(
 def test_a_transaction_not_the_wallet_s_is_refused(
     made: tuple[BtclibWallet, _Chain],
 ) -> None:
-    """The ledger's refusal is a `ValueError`."""
+    """A key given as the id is in no text of the refusal; nothing chained."""
     wallet, _ = made
-    with pytest.raises(ValueError, match="not a ledger transaction"):
-        wallet.transaction(b"\x02" * 32)
+    with pytest.raises(
+        ValueError, match="^not a transaction of the wallet$"
+    ) as excinfo:
+        wallet.transaction(_KEY)
+    _assert_secret_free(excinfo.value, _KEY)
+
+
+def test_abandon_refuses_a_transaction_not_the_wallet_s(
+    made: tuple[BtclibWallet, _Chain],
+) -> None:
+    """A key given as the id is in no text of the refusal; nothing chained."""
+    wallet, _ = made
+    with pytest.raises(
+        ValueError, match="^not abandoned: not a transaction of the wallet$"
+    ) as excinfo:
+        wallet.abandon(_KEY)
+    _assert_secret_free(excinfo.value, _KEY)
 
 
 def test_a_spend_pays_and_is_read_back(
@@ -453,10 +487,13 @@ def test_abandon_marks_a_payment_out_of_the_mempool(
 def test_abandon_refuses_a_confirmed_transaction(
     funded: tuple[BtclibWallet, _Chain, Tx],
 ) -> None:
-    """The ledger's refusal is a `ValueError`."""
+    """The refusal names the state and not the id, and chains nothing."""
     wallet, _, payment = funded
-    with pytest.raises(ValueError, match="cannot be abandoned"):
+    with pytest.raises(
+        ValueError, match="^not abandoned: a confirmed transaction$"
+    ) as excinfo:
         wallet.abandon(payment.id)
+    _assert_secret_free(excinfo.value, payment.id)
 
 
 def test_unload_reads_the_node_then_load_answers_from_the_file(

@@ -363,16 +363,20 @@ class BitcoindWallet:
 
         :raises ValueError: Core refused it with
             `RPC_INVALID_ADDRESS_OR_KEY`, as it refuses a transaction in a
-            block or the mempool and one not the wallet's; the message
-            names the transaction.
+            block or the mempool and one not the wallet's. The message
+            names the code and not the transaction, by section 7's *A
+            refusal carries no secret* of the organization's standard.
         """
         try:
             self._call("abandontransaction", [txid.hex()])
         except RpcError as exc:
             if exc.code != _RPC_INVALID_ADDRESS_OR_KEY:
                 raise
-            err_msg = f"not abandoned: {txid.hex()}"
-            raise ValueError(err_msg) from exc
+        else:
+            return
+        # raised here, outside the `except` block, so it chains no RPC error
+        err_msg = "not abandoned: Core answered RPC_INVALID_ADDRESS_OR_KEY"
+        raise ValueError(err_msg)
 
     def unload(self) -> None:
         """Unload the wallet with `unloadwallet`, and off the startup list.

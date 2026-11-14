@@ -67,15 +67,16 @@ def _tx(value: int = 1_000, network: str = "regtest") -> Tx:
 _WIF = "cMahea7zqjxrtgAbB7LSGbcQUr1uX1ojuat9jZodMN9wHZo77nNv"
 
 
-def _assert_no_key(exc: BaseException) -> None:
-    """Assert `_WIF` is in no text or argument of `exc`, which chains nothing.
+def _assert_no_key(exc: BaseException, secrets: Sequence[str] = (_WIF,)) -> None:
+    """Assert no secret is in a text or argument of `exc`, which chains nothing.
 
     `__context__` is asked as well as `__cause__`: `raise ... from None`
     hides the first from a traceback and keeps it.
     """
-    assert _WIF not in str(exc)
-    assert all(_WIF not in repr(arg) for arg in exc.args)
-    assert all(_WIF not in repr(value) for value in vars(exc).values())
+    for secret in secrets:
+        assert secret not in str(exc)
+        assert all(secret not in repr(arg) for arg in exc.args)
+        assert all(secret not in repr(value) for value in vars(exc).values())
     assert exc.__cause__ is None
     assert exc.__context__ is None
 
@@ -632,14 +633,20 @@ def test_a_thrown_import_error_is_refused_with_its_code_alone() -> None:
     _assert_no_key(excinfo.value)
 
 
-def test_a_refused_abandon_is_a_value_error_naming_the_transaction() -> None:
-    """Core's `RPC_INVALID_ADDRESS_OR_KEY`, chained."""
-    error = {"code": -5, "message": "Transaction not eligible for abandonment"}
+def test_a_refused_abandon_names_the_code_and_not_the_transaction() -> None:
+    """A key given as the id is in no text of the refusal; nothing chained.
+
+    Core's message here quotes it too, and is not relayed.
+    """
+    key = (7).to_bytes(32, "big")
+    error = {"code": -5, "message": f"Transaction not eligible: {key.hex()}"}
     node = _ClientNode(_client(error, "abandontransaction"))
     wallet = BitcoindWallet(cast("NodeAdapter", node), _NAME)
-    with pytest.raises(ValueError, match=f"^not abandoned: {_TXID}$") as excinfo:
-        wallet.abandon(bytes.fromhex(_TXID))
-    assert isinstance(excinfo.value.__cause__, RpcError)
+    with pytest.raises(
+        ValueError, match="^not abandoned: Core answered RPC_INVALID_ADDRESS_OR_KEY$"
+    ) as excinfo:
+        wallet.abandon(key)
+    _assert_no_key(excinfo.value, (key.hex(), key[::-1].hex(), repr(key)))
 
 
 def test_any_other_error_of_abandon_is_raised_as_it_comes() -> None:

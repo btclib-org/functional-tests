@@ -122,8 +122,9 @@ def _signed(
 
 def _refuses_abandon(wallet: WalletAdapter, txid: bytes, message: str) -> None:
     """Assert `wallet` refuses to abandon `txid`, as Core does on bitcoind."""
-    with pytest.raises(ValueError, match=txid.hex()):
+    with pytest.raises(ValueError, match="^not abandoned: ") as excinfo:
         wallet.abandon(txid)
+    assert txid.hex() not in str(excinfo.value)
     if isinstance(wallet, BitcoindWallet):
         refused(
             wallet.rpc,
