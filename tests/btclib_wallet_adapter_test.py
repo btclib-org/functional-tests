@@ -21,6 +21,7 @@ from btclib.b58 import wif_from_prv_key
 from btclib.fee import FeeRate
 from btclib.key import PrvKeyData
 from btclib.script import ScriptPubKey
+from btclib.script.engine import verify_input
 from btclib.script.witness import Witness
 from btclib.tx import OutPoint, Tx, TxIn, TxOut
 from btclib_wallet.descriptors.descriptors import add_checksum
@@ -34,6 +35,7 @@ from btclib_wallet.fetch.history import (
 )
 from btclib_wallet.fetch.relay_fees import RelayFees
 from btclib_wallet.ledger import Ledger
+from btclib_wallet.psbt.psbt import Psbt
 
 from btclib_functional_tests import btclib_wallet_adapter
 from btclib_functional_tests.btclib_wallet_adapter import (
@@ -372,18 +374,35 @@ def test_sign_refuses_an_input_it_cannot_sign(
     assert excinfo.value.__cause__ is None
 
 
-def test_sign_refuses_an_input_another_party_signed(
-    funded: tuple[BtclibWallet, _Chain, Tx],
-) -> None:
-    """Its signature is not kept: the ledger holds no output it spends."""
-    wallet, _, payment = funded
-    signed_elsewhere = TxIn(
-        OutPoint(b"\x03" * 32, 0), script_witness=Witness([b"\x30" * 71, b"\x02" * 33])
-    )
-    out = TxOut(_VALUE // 2, ScriptPubKey.from_address(_ADDRESS))
-    tx = Tx(2, 0, [TxIn(OutPoint(payment.id, 0)), signed_elsewhere], [out])
+def test_sign_refuses_an_input_another_party_signed(tmp_path: Path) -> None:
+    """Alice refuses a transaction carrying bob's valid signature on his coin.
+
+    Core's `signrawtransactionwithwallet` reads bob's coin from its node,
+    keeps his signature and signs alice's input:
+    [ISS 651](https://github.com/btclib-org/functional-tests/issues/651)
+    changes this refusal into that answer.
+    """
+    chain = _Chain()
+    factory = BtclibWalletFactory(tmp_path, lambda _: chain)
+    node = cast("NodeAdapter", _Node())
+    alice = factory.create(node, "alice")
+    bob = factory.create(node, "bob")
+    alice_coin = _payment(alice.new_address())
+    bob_coin = _payment(bob.new_address())
+    chain.mine(alice_coin, bob_coin)
+    vin = [TxIn(OutPoint(alice_coin.id, 0)), TxIn(OutPoint(bob_coin.id, 0))]
+    tx = Tx(2, 0, vin, [TxOut(_VALUE, ScriptPubKey.from_address(_ADDRESS))])
+    # bob signs his input, told what alice's spends
+    psbt = Psbt.from_tx(Tx.parse(tx.serialize(include_witness=False)))
+    psbt.inputs[0].non_witness_utxo = alice_coin
+    psbt.inputs[0].witness_utxo = alice_coin.vout[0]
+    bob.balance()
+    ((pub_key, sig),) = bob.ledger.sign(psbt).inputs[1].partial_sigs.items()
+    tx.vin[1].script_witness = Witness([sig, pub_key])
+    verify_input([alice_coin.vout[0], bob_coin.vout[0]], tx, 1)
     with pytest.raises(ValueError, match="^inputs left unsigned$"):
-        wallet.sign(tx)
+        alice.sign(tx)
+    factory.close()
 
 
 def test_an_imported_descriptor_makes_its_payments_the_wallet_s(
