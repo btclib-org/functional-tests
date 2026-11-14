@@ -32,6 +32,13 @@ btclib\_functional\_tests.btclib\_node module
    :members:
    :show-inheritance:
 
+btclib\_functional\_tests.btclib\_wallet\_adapter module
+---------------------------------------------------------
+
+.. automodule:: btclib_functional_tests.btclib_wallet_adapter
+   :members:
+   :show-inheritance:
+
 btclib\_functional\_tests.capability module
 -------------------------------------------
 

@@ -82,6 +82,7 @@ intersphinx_mapping = {
         "https://bitcoin-core-rpc.readthedocs.io/en/latest/",
         None,
     ),
+    "btclib_wallet": ("https://btclib-wallet.readthedocs.io/en/latest/", None),
 }
 # no reuse of a fetched inventory: sphinx keeps one for as many days as
 # this allows, invisibly to a diff and even under -E, and a sibling's

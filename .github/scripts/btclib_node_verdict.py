@@ -740,6 +740,13 @@ _ROWS: dict[str, str] = {
     ),
     "wallet_anchor": "`wallet_anchor.py`",
     "wallet_balance": "`wallet_balance.py`",
+    "wallet_abandonconflict": "`wallet_abandonconflict.py`",
+    "wallet_txn_doublespend::test_a_double_spend_conflicts_the_wallet_s_payments": (
+        "`wallet_txn_doublespend.py`"
+    ),
+    "wallet_txn_doublespend::test_a_double_spend_conflicts_the_wallet_s_confirmed_payments": (
+        "`wallet_txn_doublespend.py` (`--mineblock`)"
+    ),
     "feature_startupnotify": "`feature_startupnotify.py`",
     "rpc_dumptxoutset": "`rpc_dumptxoutset.py`",
     "feature_loadblock": "`feature_loadblock.py`",

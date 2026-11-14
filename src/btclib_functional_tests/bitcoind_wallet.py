@@ -59,6 +59,7 @@ from btclib_functional_tests.wallet import (
     TxInfo,
     Utxo,
     WalletCapability,
+    network_of,
 )
 
 __all__ = [
@@ -66,15 +67,9 @@ __all__ = [
     "BitcoindWalletFactory",
 ]
 
-# btclib's network for each chain `NodeAdapter.chain` names, in Core's
-# own `-chain=` vocabulary
-_NETWORKS = {
-    "main": "mainnet",
-    "test": "testnet",
-    "testnet4": "testnet4",
-    "signet": "signet",
-    "regtest": "regtest",
-}
+# `src/rpc/protocol.h`: `RPC_INVALID_ADDRESS_OR_KEY`, what
+# `abandontransaction` answers a transaction it does not abandon
+_RPC_INVALID_ADDRESS_OR_KEY = -5
 
 
 def _shape(answer: object) -> str:
@@ -84,12 +79,40 @@ def _shape(answer: object) -> str:
     return f"a {type(answer).__name__}"
 
 
+def _txid_hex(txid: object) -> str:
+    """Return `txid` in hex, refusing all but 32 bytes before Core sees it.
+
+    Core's `ParseHashV` refuses any other string with a message that quotes
+    it (`src/rpc/util.cpp`, bitcoin/bitcoin@f0de87f040, the v32.1 tag), and
+    a key given by mistake as an id would be printed. Of a 32-byte id,
+    `gettransaction`, `lockunspent` and `abandontransaction` quote nothing.
+    The refusal names the type and the length alone, as `_shape` does.
+
+    :raises TypeError: `txid` is not bytes.
+    :raises ValueError: `txid` is not 32 bytes.
+    """
+    if not isinstance(txid, bytes):
+        err_msg = f"not a transaction id: {_shape(txid)}"
+        raise TypeError(err_msg)
+    if len(txid) != 32:
+        err_msg = f"not a transaction id: {_shape(txid)}"
+        raise ValueError(err_msg)
+    return txid.hex()
+
+
 def _sats(amount: object) -> int:
     """Return an RPC amount, a `Decimal` of bitcoin, in satoshi."""
     if not isinstance(amount, Decimal):
         err_msg = f"not an amount: {_shape(amount)}"
         raise TypeError(err_msg)
     return sats_from_btc(amount)
+
+
+def _signed_sats(amount: object) -> int:
+    """Return an RPC amount that may be negative, in satoshi."""
+    if isinstance(amount, Decimal) and amount < 0:
+        return -_sats(-amount)
+    return _sats(amount)
 
 
 def _on_chain(tx: Tx, network: str) -> Tx:
@@ -168,7 +191,7 @@ class BitcoindWallet:
     @property
     def network(self) -> str:
         """The node's chain by btclib's name, the one each address is for."""
-        return _NETWORKS[self._node.chain]
+        return network_of(self._node)
 
     def _call(
         self,
@@ -205,7 +228,7 @@ class BitcoindWallet:
             _sats(mine["trusted"]),
             _sats(mine["untrusted_pending"]),
             _sats(mine["immature"]),
-            _sats(mine["nonmempool"]) if "nonmempool" in mine else None,
+            _signed_sats(mine["nonmempool"]) if "nonmempool" in mine else None,
         )
 
     def utxos(
@@ -245,15 +268,37 @@ class BitcoindWallet:
         )
 
     def transaction(self, txid: bytes) -> TxInfo:
-        """Return the transaction and its trust from `gettransaction`.
+        """Return what `gettransaction` answers of the transaction.
 
         Core answers `trusted` only for a transaction in no block
         (`WalletTxToJSON`, `src/wallet/rpc/transactions.cpp`): one in a
-        block is trusted. Each output carries the node's chain, `network`.
+        block is trusted. Its `fee` is negative, and absent where the
+        transaction spends none of the wallet's coins. It reports
+        `abandoned` on each entry of `details`, so a transaction with no
+        entry reads as not abandoned. Each output carries the node's
+        chain, `network`.
+
+        :raises TypeError: `txid` is not bytes (`_txid_hex`).
+        :raises ValueError: `txid` is not 32 bytes (`_txid_hex`).
         """
-        answer = _dict(self._call("gettransaction", [txid.hex()]), "gettransaction")
+        answer = _dict(
+            self._call("gettransaction", [_txid_hex(txid)]), "gettransaction"
+        )
         tx = _on_chain(Tx.parse(bytes.fromhex(str(answer["hex"]))), self.network)
-        return TxInfo(tx, answer.get("trusted", True) is True)
+        details = answer["details"]
+        conflicts = answer["walletconflicts"]
+        if not isinstance(details, list) or not isinstance(conflicts, list):
+            err_msg = "gettransaction answered no list of details or conflicts"
+            raise TypeError(err_msg)
+        return TxInfo(
+            tx,
+            answer.get("trusted", True) is True,
+            _int(answer["confirmations"], "confirmations"),
+            _signed_sats(answer["amount"]),
+            -_signed_sats(answer["fee"]) if "fee" in answer else None,
+            any(_dict(entry, "details")["abandoned"] is True for entry in details),
+            frozenset(bytes.fromhex(str(txid)) for txid in conflicts),
+        )
 
     def tip(self) -> BlockRef:
         """Return `getwalletinfo`'s `lastprocessedblock`."""
@@ -332,13 +377,52 @@ class BitcoindWallet:
         # raised here, outside the `except` blocks, so it has no context
         raise refusal
 
+    def lock(self, outpoint: OutPoint) -> None:
+        """Lock the output with `lockunspent`.
+
+        :raises TypeError: its `tx_id` is not bytes (`_txid_hex`).
+        :raises ValueError: its `tx_id` is not 32 bytes (`_txid_hex`).
+        """
+        txid = _txid_hex(outpoint.tx_id)
+        self._call("lockunspent", [False, [{"txid": txid, "vout": outpoint.vout}]])
+
+    def abandon(self, txid: bytes) -> None:
+        """Abandon the transaction with `abandontransaction`.
+
+        :raises ValueError: Core refused it with
+            `RPC_INVALID_ADDRESS_OR_KEY`, as it refuses a transaction in a
+            block or the mempool and one not the wallet's. The message
+            names the code and not the transaction, by section 7's *A
+            refusal carries no secret* of the organization's standard.
+            Before Core sees it, an id that is not 32 bytes is refused
+            too, and one that is not bytes raises `TypeError` (`_txid_hex`).
+        """
+        hex_txid = _txid_hex(txid)
+        try:
+            self._call("abandontransaction", [hex_txid])
+        except RpcError as exc:
+            if exc.code != _RPC_INVALID_ADDRESS_OR_KEY:
+                raise
+        else:
+            return
+        # raised here, outside the `except` block, so it chains no RPC error
+        err_msg = "not abandoned: Core answered RPC_INVALID_ADDRESS_OR_KEY"
+        raise ValueError(err_msg)
+
     def unload(self) -> None:
-        """Unload the wallet with `unloadwallet`."""
-        self._node.rpc.call("unloadwallet", [self._name])
+        """Unload the wallet with `unloadwallet`, and off the startup list.
+
+        So a restart of the node leaves it unloaded until `load`.
+        """
+        self._node.rpc.call(
+            "unloadwallet", {"wallet_name": self._name, "load_on_startup": False}
+        )
 
     def load(self) -> None:
-        """Load the wallet again with `loadwallet`."""
-        self._node.rpc.call("loadwallet", [self._name])
+        """Load the wallet again with `loadwallet`, and on the startup list."""
+        self._node.rpc.call(
+            "loadwallet", {"filename": self._name, "load_on_startup": True}
+        )
 
 
 class BitcoindWalletFactory:

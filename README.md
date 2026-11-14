@@ -63,7 +63,10 @@ repository's gates. The pinned release stays the only required oracle:
 `btclib-node-main` installs from that project's own `main`, both by
 [ISS 8](https://github.com/btclib-org/functional-tests/issues/8)'s
 decision, and both report without gating. `btcd` runs the btcd tests against
-a pinned btcd release, and reports without gating too.
+a pinned btcd release, and reports without gating too. `btclib-wallet`
+and `btclib-wallet-main` run the wallet tests with btclib-wallet's
+wallets over the pinned `bitcoind`, from its latest release and from its
+own `main`, and report without gating too.
 
 ## Contributing
 

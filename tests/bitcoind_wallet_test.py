@@ -12,7 +12,7 @@ real bitcoind, without starting one.
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from decimal import Decimal
 from typing import TYPE_CHECKING, cast
 
@@ -67,15 +67,16 @@ def _tx(value: int = 1_000, network: str = "regtest") -> Tx:
 _WIF = "cMahea7zqjxrtgAbB7LSGbcQUr1uX1ojuat9jZodMN9wHZo77nNv"
 
 
-def _assert_no_key(exc: BaseException) -> None:
-    """Assert `_WIF` is in no text or argument of `exc`, which chains nothing.
+def _assert_no_key(exc: BaseException, secrets: Sequence[str] = (_WIF,)) -> None:
+    """Assert no secret is in a text or argument of `exc`, which chains nothing.
 
     `__context__` is asked as well as `__cause__`: `raise ... from None`
     hides the first from a traceback and keeps it.
     """
-    assert _WIF not in str(exc)
-    assert all(_WIF not in repr(arg) for arg in exc.args)
-    assert all(_WIF not in repr(value) for value in vars(exc).values())
+    for secret in secrets:
+        assert secret not in str(exc)
+        assert all(secret not in repr(arg) for arg in exc.args)
+        assert all(secret not in repr(value) for value in vars(exc).values())
     assert exc.__cause__ is None
     assert exc.__context__ is None
 
@@ -195,6 +196,18 @@ def test_balances_are_getbalances_mine() -> None:
     assert wallet.balances() == Balances(100_000_000, 50_000_000, 0, 1)
 
 
+def test_a_negative_nonmempool_bucket_is_read() -> None:
+    """Core answers `nonmempool` below zero: what a spend outside it takes."""
+    mine = {
+        "trusted": Decimal(1),
+        "untrusted_pending": Decimal(0),
+        "immature": Decimal(0),
+        "nonmempool": Decimal("-0.25"),
+    }
+    wallet, _ = _wallet(getbalances={"mine": mine})
+    assert wallet.balances() == Balances(100_000_000, 0, 0, -25_000_000)
+
+
 def test_balances_of_a_build_without_nonmempool_leave_it_none() -> None:
     """A bitcoind before `v32.0` answers no `nonmempool`."""
     mine = {
@@ -274,19 +287,79 @@ def test_a_listunspent_that_is_no_list_is_refused() -> None:
         wallet.utxos()
 
 
+def _gettransaction(tx: Tx, **fields: object) -> dict[str, object]:
+    """Return `gettransaction`'s answer of a confirmed receipt, and `fields`."""
+    answer: dict[str, object] = {
+        "hex": _hex(tx),
+        "confirmations": 1,
+        "amount": Decimal("0.00001"),
+        "details": [{"category": "receive", "abandoned": False}],
+        "walletconflicts": [],
+    }
+    return answer | fields
+
+
 def test_a_transaction_in_a_block_is_trusted() -> None:
-    """Core answers no `trusted` for a confirmed transaction."""
+    """Core answers no `trusted` for a confirmed transaction, nor a fee here."""
     tx = _tx()
-    wallet, node = _wallet(gettransaction={"hex": _hex(tx), "confirmations": 1})
-    assert wallet.transaction(tx.id) == TxInfo(tx, trusted=True)
+    wallet, node = _wallet(gettransaction=_gettransaction(tx))
+    assert wallet.transaction(tx.id) == TxInfo(
+        tx, True, 1, 1_000, None, False, frozenset()
+    )
     assert node.calls[-1] == (_NAME, "gettransaction", [tx.id.hex()])
 
 
 def test_a_transaction_in_no_block_is_as_trusted_as_core_says() -> None:
     """An unconfirmed transaction carries Core's own `trusted`."""
     tx = _tx()
-    wallet, _ = _wallet(gettransaction={"hex": _hex(tx), "trusted": False})
-    assert wallet.transaction(tx.id) == TxInfo(tx, trusted=False)
+    answer = _gettransaction(tx, trusted=False, confirmations=0)
+    wallet, _ = _wallet(gettransaction=answer)
+    assert wallet.transaction(tx.id).trusted is False
+
+
+def test_a_payment_reads_its_amount_and_fee_as_core_answers() -> None:
+    """A payment's `amount` is negative, as Core answers; its `fee` is not."""
+    tx = _tx()
+    answer = _gettransaction(tx, amount=Decimal("-0.5"), fee=Decimal("-0.0001"))
+    wallet, _ = _wallet(gettransaction=answer)
+    info = wallet.transaction(tx.id)
+    assert (info.amount, info.fee) == (-50_000_000, 10_000)
+
+
+def test_a_conflicted_transaction_reads_its_conflicts_and_depth() -> None:
+    """`walletconflicts` in display order, and confirmations below zero."""
+    tx = _tx()
+    answer = _gettransaction(tx, confirmations=-2, walletconflicts=["ab" * 32])
+    wallet, _ = _wallet(gettransaction=answer)
+    info = wallet.transaction(tx.id)
+    assert info.confirmations == -2
+    assert info.wallet_conflicts == {bytes.fromhex("ab" * 32)}
+
+
+@pytest.mark.parametrize(
+    "details, abandoned",
+    [
+        ([{"category": "send", "abandoned": True}], True),
+        ([{"category": "send", "abandoned": False}], False),
+        ([], False),
+    ],
+)
+def test_abandoned_is_what_the_details_report(
+    details: list[dict[str, object]], *, abandoned: bool
+) -> None:
+    """Core reports `abandoned` on each entry; with none, it is not."""
+    tx = _tx()
+    wallet, _ = _wallet(gettransaction=_gettransaction(tx, details=details))
+    assert wallet.transaction(tx.id).abandoned is abandoned
+
+
+@pytest.mark.parametrize("field", ["details", "walletconflicts"])
+def test_details_or_conflicts_that_are_no_list_are_refused(field: str) -> None:
+    """Either answered as anything but a list is named in the error."""
+    tx = _tx()
+    wallet, _ = _wallet(gettransaction=_gettransaction(tx, **{field: {}}))
+    with pytest.raises(TypeError, match="no list of details or conflicts"):
+        wallet.transaction(tx.id)
 
 
 def test_tip_is_getwalletinfo_s_last_processed_block() -> None:
@@ -349,7 +422,7 @@ def test_spend_pays_a_script_s_address_on_the_node_s_chain(chain: str) -> None:
     wallet, node = _wallet(
         chain,
         send={"txid": tx.id.hex(), "complete": True},
-        gettransaction={"hex": _hex(tx), "trusted": True},
+        gettransaction=_gettransaction(tx, trusted=True),
     )
     wallet.spend([TxOut(1, _SCRIPT)])
     payee = address(_SCRIPT, wallet.network)
@@ -365,7 +438,7 @@ def test_each_returned_output_carries_the_node_s_chain(
     tx = _tx()
     wallet, _ = _wallet(
         chain,
-        gettransaction={"hex": _hex(tx), "trusted": True},
+        gettransaction=_gettransaction(tx, trusted=True),
         signrawtransactionwithwallet={"hex": _hex(tx), "complete": True},
         send={"txid": tx.id.hex(), "complete": True},
     )
@@ -385,7 +458,7 @@ def test_spend_is_send_and_returns_the_transaction() -> None:
     tx = _tx()
     wallet, node = _wallet(
         send={"txid": tx.id.hex(), "complete": True},
-        gettransaction={"hex": _hex(tx), "trusted": True},
+        gettransaction=_gettransaction(tx, trusted=True),
     )
     script = ScriptPubKey.from_address(address(_SCRIPT, "regtest"))
     assert wallet.spend([TxOut(150_000_000, script), TxOut(1, script)]) == tx
@@ -452,11 +525,83 @@ def test_a_result_of_another_shape_is_named_by_its_shape() -> None:
 
 
 def test_unload_and_load_name_the_wallet_at_the_node() -> None:
-    """`unloadwallet` and `loadwallet`, at the node's own endpoint."""
+    """`unloadwallet` and `loadwallet`, at the node's own endpoint.
+
+    Off the startup list, and back on it, so that a restart between the
+    two leaves the wallet unloaded.
+    """
     wallet, node = _wallet()
     wallet.unload()
     wallet.load()
-    assert node.calls == [("", "unloadwallet", [_NAME]), ("", "loadwallet", [_NAME])]
+    assert node.calls == [
+        ("", "unloadwallet", {"wallet_name": _NAME, "load_on_startup": False}),
+        ("", "loadwallet", {"filename": _NAME, "load_on_startup": True}),
+    ]
+
+
+def test_lock_is_lockunspent_of_the_output() -> None:
+    """The output, in display order, locked."""
+    wallet, node = _wallet()
+    wallet.lock(OutPoint(bytes.fromhex(_TXID), 3))
+    assert node.calls == [
+        _SYNC,
+        (_NAME, "lockunspent", [False, [{"txid": _TXID, "vout": 3}]]),
+    ]
+
+
+# a private key as a 33-byte payload, `00 || k`, and as WIF bytes: each
+# passed by mistake where a transaction id belongs
+_KEY_PAYLOAD = b"\x00" + (7).to_bytes(32, "big")
+_WIF_BYTES = _WIF.encode()
+
+
+def _spellings(secret: bytes) -> tuple[str, ...]:
+    """Return what a refusal could print of `secret`."""
+    spellings = (secret.hex(), secret[::-1].hex(), repr(secret))
+    return (*spellings, _WIF) if secret == _WIF_BYTES else spellings
+
+
+def _refusals(wallet: BitcoindWallet, txid: bytes) -> list[ValueError]:
+    """Return the refusal of each method that sends a transaction id."""
+    calls: list[Callable[[], object]] = [
+        lambda: wallet.transaction(txid),
+        lambda: wallet.lock(OutPoint(txid, 0, check_validity=False)),
+        lambda: wallet.abandon(txid),
+    ]
+    refusals = []
+    for call in calls:
+        with pytest.raises(ValueError, match="^not a transaction id: ") as excinfo:
+            call()
+        refusals.append(excinfo.value)
+    return refusals
+
+
+@pytest.mark.parametrize("key", [_KEY_PAYLOAD, _WIF_BYTES], ids=["payload", "wif"])
+def test_an_id_not_of_32_bytes_is_refused_before_core_sees_it(key: bytes) -> None:
+    """Core's `ParseHashV` would quote it; the refusal gives its length."""
+    wallet, node = _wallet()
+    for refusal in _refusals(wallet, key):
+        assert str(refusal) == f"not a transaction id: a bytes of length {len(key)}"
+        _assert_no_key(refusal, _spellings(key))
+    assert node.calls == []
+
+
+def test_an_id_not_of_bytes_is_refused_before_core_sees_it() -> None:
+    """A WIF string names its type and length alone."""
+    wallet, node = _wallet()
+    with pytest.raises(
+        TypeError, match="^not a transaction id: a str of length 52$"
+    ) as excinfo:
+        wallet.abandon(cast("bytes", _WIF))
+    _assert_no_key(excinfo.value)
+    assert node.calls == []
+
+
+def test_abandon_is_abandontransaction() -> None:
+    """The transaction, in display order, abandoned."""
+    wallet, node = _wallet()
+    wallet.abandon(bytes.fromhex(_TXID))
+    assert node.calls == [_SYNC, (_NAME, "abandontransaction", [_TXID])]
 
 
 class _WalletlessNode:
@@ -534,6 +679,32 @@ def test_a_thrown_import_error_is_refused_with_its_code_alone() -> None:
     ) as excinfo:
         wallet.import_descriptor(f"wpkh( {_WIF})")
     _assert_no_key(excinfo.value)
+
+
+def test_a_refused_abandon_names_the_code_and_not_the_transaction() -> None:
+    """A key given as the id is in no text of the refusal; nothing chained.
+
+    Core's message here quotes it too, and is not relayed.
+    """
+    key = (7).to_bytes(32, "big")
+    error = {"code": -5, "message": f"Transaction not eligible: {key.hex()}"}
+    node = _ClientNode(_client(error, "abandontransaction"))
+    wallet = BitcoindWallet(cast("NodeAdapter", node), _NAME)
+    with pytest.raises(
+        ValueError, match="^not abandoned: Core answered RPC_INVALID_ADDRESS_OR_KEY$"
+    ) as excinfo:
+        wallet.abandon(key)
+    _assert_no_key(excinfo.value, (key.hex(), key[::-1].hex(), repr(key)))
+
+
+def test_any_other_error_of_abandon_is_raised_as_it_comes() -> None:
+    """A code other than `RPC_INVALID_ADDRESS_OR_KEY` is not a refusal."""
+    error = {"code": -1, "message": "boom"}
+    node = _ClientNode(_client(error, "abandontransaction"))
+    wallet = BitcoindWallet(cast("NodeAdapter", node), _NAME)
+    with pytest.raises(RpcError) as excinfo:
+        wallet.abandon(bytes.fromhex(_TXID))
+    assert excinfo.value.code == -1
 
 
 def test_any_other_failure_of_the_import_names_its_type_alone() -> None:

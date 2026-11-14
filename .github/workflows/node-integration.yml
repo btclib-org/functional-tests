@@ -75,6 +75,15 @@ name: node-integration
 # beside the pinned one, so that CI checks ISS 354's rule (every port
 # passes on every build). Releases do not move, so it also runs on pull
 # requests.
+#
+# `btclib-wallet` and `btclib-wallet-main` are ISS 619's: the wallet
+# tests with btclib-wallet's wallets, in this process, over the pinned
+# bitcoind, each weighed against `TF2.md`'s *The btclib-wallet ledger*
+# and reporting without gating, as `btclib-node` and `btclib-node-main`
+# do. `btclib-wallet` is a dependency of this project, so each job
+# installs the build it asks about over the locked environment: the
+# latest release, or `main`. `TF2_BTCLIB_WALLET` switches the tests on;
+# without it they skip with the prefix the `bitcoind` job exempts.
 
 on:
   push:
@@ -114,8 +123,9 @@ jobs:
       integration-env-var: TF2_INTEGRATION
       bitcoind-path-env-var: TF2_BITCOIND
       # this job's own environment has no btclib-node interpreter to
-      # point TF2_BTCLIB_NODE_PYTHON at, and no btcd, so every test asking
-      # for either skips here rather than running -- a legitimate skip the
+      # point TF2_BTCLIB_NODE_PYTHON at, no btcd, and no
+      # TF2_BTCLIB_WALLET, so every test asking for any of them skips
+      # here rather than running -- a legitimate skip the
       # reusable job's own "did the node tests run" check would otherwise
       # flag. The prefix is tests/integration/conftest.py's `NO_TARGET`,
       # which the skip of a target node that is not installed starts
@@ -337,6 +347,77 @@ jobs:
         run: |
           uv run --locked --no-default-groups --group test \
             python .github/scripts/check_node_ran.py integration.xml
+
+  btclib-wallet:
+    name: Regtest of btclib-wallet over bitcoind
+    if: ${{ !github.event.pull_request.draft && github.event.action != 'closed' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # a moved `TF2.md` cell here is a finding for the ledger or for
+    # btclib-wallet's own tracker, as `btclib-node`'s is for btclib-node's
+    continue-on-error: true
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          enable-cache: true
+      # the release uv.lock locks may not be the latest: this job asks
+      # about the latest
+      - name: Install btclib-wallet's latest release
+        run: |
+          uv sync --locked --no-default-groups --group test
+          uv pip install --upgrade btclib-wallet
+          version=$(uv run --no-sync python -c '
+          import importlib.metadata
+          print(importlib.metadata.version("btclib-wallet"))
+          ')
+          echo "### btclib-wallet $version" >> "$GITHUB_STEP_SUMMARY"
+      # `btclib-node`'s own two steps above
+      - name: Check out btclib-org/.github's scripts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: btclib-org/.github
+          ref: main
+          path: standard
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+      - name: Install bitcoind
+        id: bitcoind
+        run: |
+          daemon=$(uv run --no-project --python 3.15 \
+            standard/.github/scripts/install_bitcoind.py \
+            "$BITCOIND_VERSION" "$BITCOIND_SHA256")
+          echo "path=$daemon" >> "$GITHUB_OUTPUT"
+          "$daemon" -version | head -n 1
+      # continue-on-error: `btclib-node`'s own step above has why.
+      # `--no-sync` keeps the release installed above
+      - name: Run the integration tests against btclib-wallet
+        continue-on-error: true
+        env:
+          BITCOIND_PATH: ${{ steps.bitcoind.outputs.path }}
+        run: |
+          export TF2_INTEGRATION=1
+          export TF2_BTCLIB_WALLET=1
+          export TF2_BITCOIND="$BITCOIND_PATH"
+          uv run --no-sync pytest tests/integration/*_btclib_wallet_test.py \
+            --junitxml=integration.xml
+      # `btclib-node`'s own step above
+      - name: Fail if the node tests did not run
+        if: ${{ !cancelled() }}
+        run: |
+          uv run --no-sync python .github/scripts/check_node_ran.py integration.xml
+      # `btclib-node`'s own step above, against `TF2.md`'s btclib-wallet
+      # ledger
+      - name: Compare the report with TF2.md
+        if: ${{ !cancelled() }}
+        run: |
+          set -o pipefail
+          uv run --no-sync python .github/scripts/btclib_wallet_verdict.py \
+            TF2.md integration.xml release | tee -a "$GITHUB_STEP_SUMMARY"
 
   core-master:
     name: Regtest against Core built from master
@@ -579,4 +660,72 @@ jobs:
           set -o pipefail
           uv run --locked --no-default-groups --group test \
             python .github/scripts/btclib_node_verdict.py \
+            TF2.md integration.xml main | tee -a "$GITHUB_STEP_SUMMARY"
+
+  btclib-wallet-main:
+    name: Regtest of btclib-wallet's main over bitcoind
+    if: ${{ github.event_name != 'pull_request' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    continue-on-error: true
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          enable-cache: true
+      # git+...@main rather than the release `btclib-wallet` installs,
+      # as `btclib-node-main` does for btclib-node
+      - name: Install btclib-wallet's main
+        run: |
+          uv sync --locked --no-default-groups --group test
+          uv pip install "git+https://github.com/btclib-org/btclib-wallet@main"
+          sha=$(uv run --no-sync python -c '
+          import importlib.metadata, json
+          direct_url = importlib.metadata.distribution("btclib-wallet").read_text(
+              "direct_url.json"
+          )
+          print(json.loads(direct_url)["vcs_info"]["commit_id"])
+          ')
+          echo "### btclib-wallet built from \`$sha\`" >> "$GITHUB_STEP_SUMMARY"
+      # `btclib-wallet`'s own steps above
+      - name: Check out btclib-org/.github's scripts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: btclib-org/.github
+          ref: main
+          path: standard
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+      - name: Install bitcoind
+        id: bitcoind
+        run: |
+          daemon=$(uv run --no-project --python 3.15 \
+            standard/.github/scripts/install_bitcoind.py \
+            "$BITCOIND_VERSION" "$BITCOIND_SHA256")
+          echo "path=$daemon" >> "$GITHUB_OUTPUT"
+          "$daemon" -version | head -n 1
+      - name: Run the integration tests against btclib-wallet's main
+        continue-on-error: true
+        env:
+          BITCOIND_PATH: ${{ steps.bitcoind.outputs.path }}
+        run: |
+          export TF2_INTEGRATION=1
+          export TF2_BTCLIB_WALLET=1
+          export TF2_BITCOIND="$BITCOIND_PATH"
+          uv run --no-sync pytest tests/integration/*_btclib_wallet_test.py \
+            --junitxml=integration.xml
+      - name: Fail if the node tests did not run
+        if: ${{ !cancelled() }}
+        run: |
+          uv run --no-sync python .github/scripts/check_node_ran.py integration.xml
+      # against each cell's verdict for a build past every issue it names
+      - name: Compare the report with TF2.md
+        if: ${{ !cancelled() }}
+        run: |
+          set -o pipefail
+          uv run --no-sync python .github/scripts/btclib_wallet_verdict.py \
             TF2.md integration.xml main | tee -a "$GITHUB_STEP_SUMMARY"
