@@ -19,8 +19,8 @@ Every method that reads the wallet or spends from it first calls
 `Ledger.sync`, as `wallet.py`'s module docstring asks. `new_address`,
 `new_change_address` and `lock` read no chain, and sync nothing.
 
-The ledger reads the node through `NodeBackend`, which builds a
-`BitcoinCoreFetcher` for each call. A client built once would keep the
+The ledger and `sign` read the node through `NodeBackend`, which builds
+a new RPC client for each call. A client built once would keep the
 cookie of the node's first start: a restart writes a new cookie, and
 the old one no longer authenticates.
 
@@ -36,10 +36,10 @@ What differs from bitcoind's wallet here is the ledger's:
 - a descriptor imported with a WIF is watch-only: btclib-wallet's
   descriptor parser keeps the private key of an extended key, and of no
   other (`descriptors.parse`);
-- `sign` refuses an input spending no output of the ledger's, even where
-  the transaction already signs it: `Ledger.sign` needs each input's
-  previous output, and Core's wallet reads one it does not hold from its
-  node ([ISS 651](https://github.com/btclib-org/functional-tests/issues/651)).
+- `sign` refuses an input whose coin is in a block the node pruned: it
+  reads each input's previous transaction, which btclib-wallet's signer
+  asks for (its psbt's `non_witness_utxo`), where Core's wallet reads the
+  coin alone.
 """
 
 from __future__ import annotations
@@ -50,17 +50,26 @@ from collections.abc import Set as AbstractSet
 from pathlib import Path
 from typing import Protocol
 
+from bitcoin_core_rpc import RpcError, RPCErrorCode
 from btclib.alias import Octets
 from btclib.exceptions import BTClibValueError
 from btclib.fee import FeeRate
 from btclib.network import NETWORKS
+from btclib.script.engine import (
+    ALL_FLAGS,
+    ScriptFlag,
+    verify_input,
+    verify_transaction,
+)
 from btclib.script.script_pub_key import ScriptPubKey
+from btclib.script.sig_hash import PrecomputedTxData
+from btclib.script.witness import Witness
 from btclib.tx import OutPoint, Tx, TxOut
 from btclib_wallet.bip32.bip32 import rootxprv_from_seed
 from btclib_wallet.descriptors.descriptors import add_checksum
 from btclib_wallet.exceptions import FetchError
 from btclib_wallet.fetch.bitcoin_core import BitcoinCoreFetcher
-from btclib_wallet.fetch.fetcher import tx_for_network
+from btclib_wallet.fetch.fetcher import tx_for_network, tx_from_raw, tx_id_hex
 from btclib_wallet.fetch.history import ScriptHistory
 from btclib_wallet.fetch.relay_fees import RelayFees
 from btclib_wallet.ledger import Ledger, TxState
@@ -90,12 +99,36 @@ __all__ = [
 # `BitcoindAdapter`'s `-fallbackfee=0.0002`, in satoshi per 1000 vbytes
 FALLBACK_FEE_RATE = FeeRate(sats_per_kvbyte=20_000)
 
+# Core's STANDARD_SCRIPT_VERIFY_FLAGS, which its signer verifies an input
+# under (`src/policy/policy.h` and `src/script/sign.cpp`,
+# bitcoin/bitcoin@f0de87f040, the v32.1 tag): `ALL_FLAGS` is its
+# MANDATORY_SCRIPT_VERIFY_FLAGS
+_STANDARD_FLAGS = (
+    ALL_FLAGS
+    | ScriptFlag.STRICTENC
+    | ScriptFlag.MINIMALDATA
+    | ScriptFlag.DISCOURAGE_UPGRADABLE_NOPS
+    | ScriptFlag.CLEANSTACK
+    | ScriptFlag.MINIMALIF
+    | ScriptFlag.NULLFAIL
+    | ScriptFlag.LOW_S
+    | ScriptFlag.DISCOURAGE_UPGRADABLE_WITNESS_PROGRAM
+    | ScriptFlag.WITNESS_PUBKEYTYPE
+    | ScriptFlag.CONST_SCRIPTCODE
+    | ScriptFlag.DISCOURAGE_UPGRADABLE_TAPROOT_VERSION
+    | ScriptFlag.DISCOURAGE_OP_SUCCESS
+    | ScriptFlag.DISCOURAGE_UPGRADABLE_PUBKEYTYPE
+)
+
+_UNSIGNED = "inputs left unsigned"
+
 
 class ChainBackend(Protocol):
     """What a ledger reads its node through, and what a wallet asks of it.
 
     `btclib_wallet.fetch`'s `HistoryReader`, `Broadcaster` and
-    `RelayFeeReader`, and the height of the node's tip.
+    `RelayFeeReader`, the height of the node's tip, and the transaction
+    paying a coin the node holds.
     """
 
     def get_history(
@@ -116,9 +149,26 @@ class ChainBackend(Protocol):
         """Return the height of the node's tip."""
         ...
 
+    def get_coin_parent(self, outpoint: OutPoint) -> Tx | None:
+        """Return the transaction paying `outpoint`, as Core's `findCoins` does.
+
+        A transaction in the node's mempool answers for each of its
+        outputs, spent in the mempool or not. Otherwise the output is read
+        from the node's chain, where it is unspent. `None` where neither
+        holds it.
+
+        :raises btclib_wallet.exceptions.FetchError: the node holds the
+            coin, and does not give the transaction paying it, or gives
+            another.
+        """
+        ...
+
 
 class NodeBackend:
-    """`ChainBackend` over a node's RPC: a new `BitcoinCoreFetcher` a call."""
+    """`ChainBackend` over a node's RPC: a new client a call.
+
+    Each call but `get_coin_parent` is a new `BitcoinCoreFetcher`'s.
+    """
 
     def __init__(self, node: NodeAdapter) -> None:
         self._node = node
@@ -144,6 +194,55 @@ class NodeBackend:
     def get_block_count(self) -> int:
         """Return `BitcoinCoreFetcher.get_block_count`'s answer."""
         return self._fetcher().get_block_count()
+
+    def get_coin_parent(self, outpoint: OutPoint) -> Tx | None:
+        """Ask the mempool for the transaction, then the chain for the coin.
+
+        The order of Core's `CCoinsViewMemPool::GetCoin`, which `findCoins`
+        reads through. An answer by the id alone that names its
+        `blockhash` came from `-txindex`, and its coin is read from the
+        chain, where a block may have spent it. `gettxout` reads the
+        chain's coin with the mempool left out, so a spend there does not
+        hide it. Its transaction is then read in the block its
+        confirmations name, and the tip is still the one `gettxout` read
+        once that read is done.
+
+        :raises btclib_wallet.exceptions.FetchError: the node answered a
+            transaction other than the one asked, the tip moved meanwhile,
+            or that block is not available.
+        """
+        rpc = self._node.rpc
+        txid = tx_id_hex(outpoint.tx_id)
+        network = network_of(self._node)
+        try:
+            found = rpc.call("getrawtransaction", [txid, True])
+        except RpcError as exc:
+            # -5: in neither the mempool nor `-txindex`
+            if exc.code != RPCErrorCode.INVALID_ADDRESS_OR_KEY:
+                raise
+        else:
+            if "blockhash" not in found:
+                parent = tx_from_raw(bytes.fromhex(found["hex"]), txid, network)
+                return parent if outpoint.vout < len(parent.vout) else None
+        coin = rpc.call("gettxout", [txid, outpoint.vout, False])
+        if coin is None:
+            return None
+        tip = rpc.call("getblockheader", [coin["bestblock"]])["height"]
+        block = rpc.call("getblockhash", [tip - coin["confirmations"] + 1])
+        try:
+            raw = rpc.call("getrawtransaction", [txid, False, block])
+        except RpcError as exc:
+            # -1: "Block not available"
+            if exc.code != RPCErrorCode.MISC_ERROR:
+                raise
+            err_msg = "transaction: its block is not available"
+            raise FetchError(err_msg) from exc
+        # after the last read: the coin `gettxout` answered is the UTXO set's
+        # at that tip, and a block may since have spent it or left the chain
+        if rpc.call("getbestblockhash", []) != coin["bestblock"]:
+            err_msg = "transaction: the tip moved while its block was read"
+            raise FetchError(err_msg)
+        return tx_from_raw(bytes.fromhex(raw), txid, network)
 
 
 def _new_source(network: str) -> DescriptorWallet:
@@ -171,6 +270,29 @@ def _held(ledger: Ledger, txid: bytes, refused: str) -> LedgerTxInfo:
         refusal = ValueError(refused)
     # raised here, outside the `except` block, so it chains no ledger error
     raise refusal
+
+
+def _owned_parent(ledger: Ledger, outpoint: OutPoint) -> Tx | None:
+    """Return the transaction paying `outpoint`, where it pays the ledger."""
+    try:
+        parent = ledger.transaction(outpoint.tx_id).wallet_tx.tx
+    except BTClibValueError:
+        return None
+    if outpoint.vout >= len(parent.vout):
+        return None
+    script_pub_key = parent.vout[outpoint.vout].script_pub_key
+    return None if ledger.position_of(script_pub_key) is None else parent
+
+
+def _verifies(
+    spent: list[TxOut], tx: Tx, i: int, precomputed: PrecomputedTxData
+) -> bool:
+    """Whether input `i` of `tx` verifies under Core's standard flags."""
+    try:
+        verify_input(spent, tx, i, _STANDARD_FLAGS, precomputed)
+    except BTClibValueError:
+        return False
+    return True
 
 
 def _removed(path: Path) -> str | None:
@@ -341,23 +463,61 @@ class BtclibWallet:
     def sign(self, tx: Tx) -> Tx:
         """Return `tx` with every input `Ledger.sign` signs finalized.
 
+        Each input's coin is read from the node with
+        `ChainBackend.get_coin_parent`, unless it pays the ledger: Core's
+        wallet reads every input's coin from its node (`findCoins`). An
+        input keeps its `script_sig` and witness where they verify against
+        that coin, as Core's `ProduceSignature` keeps a complete one;
+        otherwise the ledger signs it where it is its own. Then every
+        input's scripts are verified under Core's standard flags, and
+        neither the amounts nor the fee, as Core's `SignTransaction` does.
+
         Each output carries the node's chain.
 
-        :raises ValueError: an input is left unsigned.
+        :raises ValueError: an input is left unsigned, or keeps a signature
+            that does not verify.
+        :raises btclib_wallet.exceptions.FetchError: from
+            `ChainBackend.get_coin_parent`: the node holds an input's coin,
+            and does not give the transaction paying it, or gives another.
         """
         # `Psbt.from_tx` empties the inputs of the transaction it is given
         unsigned = Tx.parse(tx.serialize(include_witness=False, check_validity=False))
         ledger = self._synced()
-        refusal: ValueError
+        parents: list[tuple[Tx, bool]] = []
+        spent: list[TxOut] = []
+        for tx_in in tx.vin:
+            parent = _owned_parent(ledger, tx_in.prev_out)
+            owned = parent is not None
+            if parent is None:
+                parent = self._backend.get_coin_parent(tx_in.prev_out)
+            if parent is None:
+                raise ValueError(_UNSIGNED)
+            parents.append((parent, owned))
+            spent.append(parent.vout[tx_in.prev_out.vout])
+        psbt = Psbt.from_tx(unsigned)
+        kept: dict[int, tuple[bytes, Witness]] = {}
         try:
-            final = finalize(ledger.sign(Psbt.from_tx(unsigned)))
+            # the hashes each segwit sig_hash of `tx` shares, built once
+            precomputed = PrecomputedTxData(tx, spent)
+            for i, (parent, owned) in enumerate(parents):
+                psbt_in = psbt.inputs[i]
+                if not owned:
+                    psbt_in.non_witness_utxo = parent
+                if not owned or _verifies(spent, tx, i, precomputed):
+                    kept[i] = tx.vin[i].script_sig, tx.vin[i].script_witness
+                    psbt_in.final_script_sig, psbt_in.final_script_witness = kept[i]
+            # `finalize` asks the solver for each input with no final
+            # scripts, a kept P2A input among them; where it answers None,
+            # `finalize` builds the input from its signatures or refuses it
+            final = finalize(ledger.sign(psbt), solver=lambda _, i: kept.get(i))
+            signed = extract_tx(final, verify_scripts=False, max_fee_rate=None)
+            verify_transaction(spent, signed, _STANDARD_FLAGS, check_amounts=False)
         except BTClibValueError:
-            refusal = ValueError("inputs left unsigned")
+            pass
         else:
-            # no fee ceiling: `signrawtransactionwithwallet` checks no fee
-            return tx_for_network(extract_tx(final, max_fee_rate=None), self.network)
+            return tx_for_network(signed, self.network)
         # raised here, outside the `except` block, so it chains no ledger error
-        raise refusal
+        raise ValueError(_UNSIGNED)
 
     @property
     def network(self) -> str:
@@ -476,7 +636,8 @@ class BtclibWalletFactory:
     def node_capabilities(self) -> AbstractSet[Capability]:
         """None: the wallet reads the chain over RPC calls no capability names.
 
-        The calls `BitcoinCoreFetcher` makes.
+        The calls `BitcoinCoreFetcher` and `NodeBackend.get_coin_parent`
+        make.
         """
         return frozenset()
 
