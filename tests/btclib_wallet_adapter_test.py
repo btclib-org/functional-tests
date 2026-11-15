@@ -17,6 +17,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Literal, cast, override
 
 import pytest
+from bip32_descriptors.bip32.bip32 import rootxprv_from_seed
+from bip32_descriptors.descriptors.descriptors import add_checksum
 from bitcoin_core_rpc import BitcoinCoreRpcClient, RpcError
 from btclib.b58 import wif_from_prv_key
 from btclib.exceptions import BTClibValueError
@@ -27,8 +29,6 @@ from btclib.script import ScriptPubKey, serialize
 from btclib.script.engine import PAY_TO_ANCHOR, verify_input
 from btclib.script.witness import Witness
 from btclib.tx import OutPoint, Tx, TxIn, TxOut
-from btclib_wallet.bip32.bip32 import rootxprv_from_seed
-from btclib_wallet.descriptors.descriptors import add_checksum
 from btclib_wallet.exceptions import FetchError
 from btclib_wallet.fetch.bitcoin_core import BitcoinCoreFetcher
 from btclib_wallet.fetch.history import (
