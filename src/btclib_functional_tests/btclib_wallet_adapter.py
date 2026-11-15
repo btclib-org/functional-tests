@@ -58,6 +58,7 @@ from btclib.script.engine import (
     verify_transaction,
 )
 from btclib.script.script_pub_key import ScriptPubKey
+from btclib.script.sig_hash import PrecomputedTxData
 from btclib.script.witness import Witness
 from btclib.tx import OutPoint, Tx, TxOut
 from btclib_wallet.bip32.bip32 import rootxprv_from_seed
@@ -261,10 +262,12 @@ def _owned_parent(ledger: Ledger, outpoint: OutPoint) -> Tx | None:
     return None if ledger.position_of(script_pub_key) is None else parent
 
 
-def _verifies(spent: list[TxOut], tx: Tx, i: int) -> bool:
+def _verifies(
+    spent: list[TxOut], tx: Tx, i: int, precomputed: PrecomputedTxData
+) -> bool:
     """Whether input `i` of `tx` verifies under Core's standard flags."""
     try:
-        verify_input(spent, tx, i, _STANDARD_FLAGS)
+        verify_input(spent, tx, i, _STANDARD_FLAGS, precomputed)
     except BTClibValueError:
         return False
     return True
@@ -468,14 +471,16 @@ class BtclibWallet:
             spent.append(parent.vout[tx_in.prev_out.vout])
         psbt = Psbt.from_tx(unsigned)
         kept: dict[int, tuple[bytes, Witness]] = {}
-        for i, (parent, owned) in enumerate(parents):
-            psbt_in = psbt.inputs[i]
-            if not owned:
-                psbt_in.non_witness_utxo = parent
-            if not owned or _verifies(spent, tx, i):
-                kept[i] = tx.vin[i].script_sig, tx.vin[i].script_witness
-                psbt_in.final_script_sig, psbt_in.final_script_witness = kept[i]
         try:
+            # the hashes each segwit sig_hash of `tx` shares, built once
+            precomputed = PrecomputedTxData(tx, spent)
+            for i, (parent, owned) in enumerate(parents):
+                psbt_in = psbt.inputs[i]
+                if not owned:
+                    psbt_in.non_witness_utxo = parent
+                if not owned or _verifies(spent, tx, i, precomputed):
+                    kept[i] = tx.vin[i].script_sig, tx.vin[i].script_witness
+                    psbt_in.final_script_sig, psbt_in.final_script_witness = kept[i]
             # `finalize` asks the solver for an input whose final scripts
             # are both empty, as a kept P2A input's are, and refuses it
             # where none answers
