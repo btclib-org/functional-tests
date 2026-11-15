@@ -6,7 +6,10 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, cast, override
+
 import pytest
+from btclib.b58 import wif_from_prv_key
 
 from btclib_functional_tests.capability import (
     Capability,
@@ -16,6 +19,9 @@ from btclib_functional_tests.capability import (
 )
 from btclib_functional_tests.wallet import WalletCapability
 from tests.conftest import pytest_runtest_call
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Mapping
 
 
 def test_require_passes_through_a_declared_capability() -> None:
@@ -99,9 +105,76 @@ def test_add_mapping_adds_onto_what_is_already_there() -> None:
 def test_add_mapping_refuses_a_value_of_no_capability() -> None:
     """A key no enum holds is refused, and nothing is added."""
     counts = SkipCounts()
-    with pytest.raises(ValueError, match="not a capability: 'no_such'"):
+    refusal = "^mapping key 1 is not a capability: 'no_such'$"
+    with pytest.raises(ValueError, match=refusal):
         counts.add_mapping({"mine": 1, "no_such": 1})
     assert not list(counts)
+
+
+@pytest.mark.parametrize(
+    "key, shown",
+    [
+        ("x" * 16, repr("x" * 16)),
+        ("x" * 17, "a str of 17 characters"),
+        (7, "type int"),
+    ],
+)
+def test_add_mapping_quotes_only_a_short_str_key(key: object, shown: str) -> None:
+    """A str key over 16 characters, or no str, is named by length or type."""
+    with pytest.raises(ValueError, match="^mapping key 0 is not a capability:") as info:
+        SkipCounts().add_mapping(cast("Mapping[str, int]", {key: 1}))
+    assert str(info.value) == f"mapping key 0 is not a capability: {shown}"
+
+
+class _ShortStr(str):
+    """A str that claims a length short enough to be quoted."""
+
+    __slots__ = ()
+
+    @override
+    def __len__(self) -> int:
+        return 3
+
+
+class _ClaimsStr:
+    """No str, though `isinstance` answers that it is one, holding a WIF."""
+
+    __class__ = property(lambda _self: str)
+
+    def __init__(self, wif: str) -> None:
+        self._wif = wif
+
+    def __len__(self) -> int:
+        return 3
+
+    @override
+    def __repr__(self) -> str:
+        return repr(self._wif)
+
+
+@pytest.mark.parametrize("key_of", [str, _ShortStr, _ClaimsStr])
+def test_add_mapping_refuses_a_wif_quoting_no_part_of_it(
+    key_of: Callable[[str], object],
+) -> None:
+    """A WIF passed as a key is in no text, argument or chained exception.
+
+    Passed as a str, as a str claiming a short length, and inside an object
+    `isinstance` takes for a str.
+    """
+    wif = wif_from_prv_key(7, "regtest")
+    key = key_of(wif)
+    # what the key says of itself: a str, of a length, with the WIF as repr
+    assert isinstance(key, str)
+    assert len(key) == (len(wif) if key_of is str else 3)
+    assert repr(key) == repr(wif)
+    with pytest.raises(ValueError, match="not a capability") as info:
+        SkipCounts().add_mapping(cast("Mapping[str, int]", {key: 1}))
+    exc = info.value
+    windows = {wif[i : i + 8] for i in range(len(wif) - 7)}
+    printed = (str(exc), *map(repr, exc.args), *map(repr, vars(exc).values()))
+    assert not [window for window in windows if any(window in p for p in printed)]
+    assert exc.__cause__ is None
+    assert exc.__context__ is None
 
 
 def test_add_mapping_takes_a_wallet_capability_s_value() -> None:

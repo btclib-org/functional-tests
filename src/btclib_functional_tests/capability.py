@@ -709,6 +709,23 @@ class Capability(Enum):
 # a `Capability` is a node's to declare, any other a wallet factory's
 _NODE_VALUES = frozenset(capability.value for capability in Capability)
 
+# the longest key `SkipCounts.add_mapping` quotes in a refusal
+_MAX_KEY_SHOWN = 16
+
+
+def _shown_key(key: object) -> str:
+    """Return how a refusal names `key`, quoting only a short str.
+
+    A str subclass, or an object claiming to be a str, is named by its
+    type: its own `__len__` can claim a short length, and its `__repr__`
+    print the key whole.
+    """
+    if type(key) is not str:
+        return f"type {type(key).__name__}"
+    if len(key) <= _MAX_KEY_SHOWN:
+        return repr(key)
+    return f"a str of {len(key)} characters"
+
 
 class SkipCounts:
     """One session's own tally of skips, one count per capability asked for.
@@ -762,7 +779,11 @@ class SkipCounts:
         :param mapping: a `{value: count}` mapping, as `as_mapping`
             returns.
         :raises ValueError: a key is the value of no `Capability` and of no
-            `wallet.WalletCapability`.
+            `wallet.WalletCapability`. The refusal names the key by its
+            position, and quotes it only where it is a str of at most 16
+            characters: a longer str is named by its length, any other key,
+            a subclass of str included, by its type. Section 7's *A refusal
+            carries no secret* of the organization's standard is the rule.
         """
         # imported here, not at the top: `wallet.py` imports this module
         from btclib_functional_tests.wallet import (  # noqa: PLC0415
@@ -770,9 +791,10 @@ class SkipCounts:
         )
 
         known = {member.value for member in (*Capability, *WalletCapability)}
-        for value in mapping:
+        for index, value in enumerate(mapping):
             if value not in known:
-                err_msg = f"not a capability: {value!r}"
+                shown = _shown_key(value)
+                err_msg = f"mapping key {index} is not a capability: {shown}"
                 raise ValueError(err_msg)
         self._counts.update(mapping)
 
