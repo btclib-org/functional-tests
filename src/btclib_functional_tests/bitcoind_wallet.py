@@ -324,7 +324,10 @@ class BitcoindWallet:
         chain, `network`.
 
         :raises TypeError: `txid` is not bytes (`_txid_hex`).
-        :raises ValueError: `txid` is not 32 bytes (`_txid_hex`).
+        :raises ValueError: `txid` is not 32 bytes (`_txid_hex`), or Core
+            refused the call, as it refuses a transaction not the wallet's
+            (`_by_code`).
+        :raises RuntimeError: the call failed otherwise (`_by_code`).
         """
         answer = _dict(
             self._call("gettransaction", [_txid_hex(txid)]), "gettransaction"
@@ -359,7 +362,10 @@ class BitcoindWallet:
         Each output carries the node's chain, `network`.
 
         :raises ValueError: Core answered `complete` false; the message
-            names how many inputs its `errors` lists.
+            names how many inputs its `errors` lists. Or Core refused the
+            call, as it refuses an input whose amount it is missing
+            (`_by_code`).
+        :raises RuntimeError: the call failed otherwise (`_by_code`).
         """
         hex_tx = tx.serialize(include_witness=True, check_validity=False).hex()
         answer = _dict(
@@ -431,7 +437,9 @@ class BitcoindWallet:
         """Lock the output with `lockunspent`.
 
         :raises TypeError: its `tx_id` is not bytes (`_txid_hex`).
-        :raises ValueError: its `tx_id` is not 32 bytes (`_txid_hex`).
+        :raises ValueError: its `tx_id` is not 32 bytes (`_txid_hex`), or
+            Core refused the call (`_by_code`).
+        :raises RuntimeError: the call failed otherwise (`_by_code`).
         """
         txid = _txid_hex(outpoint.tx_id)
         self._call("lockunspent", [False, [{"txid": txid, "vout": outpoint.vout}]])
