@@ -22,16 +22,21 @@ reached the wallet before the call.
 `BitcoindWalletFactory` is the `wallet.WalletFactory` a test module
 hands its body, over a node that declares `Capability.NODE_WALLET`.
 
-A refusal here carries no text of Core's answer: a wallet's answer, an
-import's error among them, can quote a private key. It names the shape
-of an answer, or Core's error code, instead (section 7 of the
-organization's standard, *A refusal carries no secret*). A call
+A refusal here, but for the sync's, carries no text of Core's answer: a
+wallet's answer, an import's error among them, can quote a private key.
+It names the shape of an answer, or Core's error code, instead (section
+7 of the organization's standard, *A refusal carries no secret*). A call
 carrying a descriptor is refused the same way whether Core answers its
-error in the result or as the call's own JSON-RPC error, and the
-refusal is raised after the `except` block, so that it chains nothing
-that holds Core's text. A number is read as Core sends it, never
-converted from text, so that no conversion's own error quotes what it
-refused.
+error in the result or as the call's own JSON-RPC error, and the refusal
+is raised after the `except` block, so that it chains nothing that holds
+Core's text. A number is read as Core sends it, never converted from
+text, so that no conversion's own error quotes what it refused.
+
+A failed call at the wallet's endpoint is refused by Core's code, or by
+the type of the client's exception, alone, since a wallet's name can be
+a secret too: `_by_code` says where the client's text holds it. The sync
+before such a call, at the node's endpoint, whose path holds no name,
+raises the client's own error, Core's text included.
 
 Each address crossing to the RPC is spelled for the node's own chain,
 `NodeAdapter.chain`: a script's bytes carry no chain, and btclib
@@ -159,19 +164,21 @@ def _check_import(answer: object) -> None:
 
 
 def _by_code(
-    rpc: BitcoinCoreRpcClient, method: str, params: Mapping[str, object]
+    rpc: BitcoinCoreRpcClient,
+    method: str,
+    params: Sequence[object] | Mapping[str, object] | None,
 ) -> object:
     """Return `rpc.call(method, params)`, refusing it by Core's code alone.
 
-    For a call whose refusal can quote what it carries. Core's
-    `createwallet` and `loadwallet` quote the wallet's name, or a path
-    ending in it (`src/wallet/rpc/wallet.cpp`, `src/wallet/walletdb.cpp`),
-    and `send` quotes an address it refuses
-    (`src/rpc/rawtransaction_util.cpp`), at bitcoin/bitcoin@f0de87f040,
-    the v32.1 tag. `unloadwallet` quotes no name there, though it carries
-    one. The client's own text of a failure can quote it too: it names a
-    wallet's endpoint, whose path holds the wallet's name, and it quotes
-    whole an error object it cannot read.
+    For a call whose refusal can quote what it carries, or name the wallet
+    it is made at. Core's `createwallet` and `loadwallet` quote the wallet's
+    name, or a path ending in it (`src/wallet/rpc/wallet.cpp`,
+    `src/wallet/walletdb.cpp`), and `send` quotes an address it refuses
+    (`src/rpc/rawtransaction_util.cpp`), at bitcoin/bitcoin@f0de87f040, the
+    v32.1 tag. `unloadwallet` quotes no name there, though it carries one.
+    The client's own text of a failure can quote it too: it names a wallet's
+    endpoint, whose path holds the wallet's name, and it quotes whole an
+    error object it cannot read.
 
     :raises ValueError: Core refused the call; the message names the
         method and Core's code where that is an integer, `None` otherwise.
@@ -230,9 +237,15 @@ class BitcoindWallet:
         method: str,
         params: Sequence[object] | Mapping[str, object] | None = None,
     ) -> object:
-        """Call `method` at this wallet, once the node's queue is delivered."""
+        """Call `method` at this wallet, once the node's queue is delivered.
+
+        :raises ValueError: Core refused the call (`_by_code`).
+        :raises RuntimeError: the call failed otherwise (`_by_code`).
+        """
+        # outside `_by_code`: the sync is at the node's endpoint, which
+        # holds no name, and its own failure is not the call's
         self._sync()
-        return self.rpc.call(method, params)
+        return _by_code(self.rpc, method, params)
 
     def _sync(self) -> None:
         """Let the node deliver its queued notifications to its wallets."""
@@ -311,7 +324,10 @@ class BitcoindWallet:
         chain, `network`.
 
         :raises TypeError: `txid` is not bytes (`_txid_hex`).
-        :raises ValueError: `txid` is not 32 bytes (`_txid_hex`).
+        :raises ValueError: `txid` is not 32 bytes (`_txid_hex`), or Core
+            refused the call, as it refuses a transaction not the wallet's
+            (`_by_code`).
+        :raises RuntimeError: the call failed otherwise (`_by_code`).
         """
         answer = _dict(
             self._call("gettransaction", [_txid_hex(txid)]), "gettransaction"
@@ -346,7 +362,10 @@ class BitcoindWallet:
         Each output carries the node's chain, `network`.
 
         :raises ValueError: Core answered `complete` false; the message
-            names how many inputs its `errors` lists.
+            names how many inputs its `errors` lists. Or Core refused the
+            call, as it refuses an input whose amount it is missing
+            (`_by_code`).
+        :raises RuntimeError: the call failed otherwise (`_by_code`).
         """
         hex_tx = tx.serialize(include_witness=True, check_validity=False).hex()
         answer = _dict(
@@ -381,10 +400,7 @@ class BitcoindWallet:
             }
             for tx_out in outputs
         ]
-        # outside `_by_code`: the sync carries no address, and its own
-        # failure is not the spend's
-        self._sync()
-        answer = _dict(_by_code(self.rpc, "send", {"outputs": payees}), "send")
+        answer = _dict(self._call("send", {"outputs": payees}), "send")
         txid = bytes.fromhex(str(answer["txid"]))
         return self.transaction(txid).tx
 
@@ -421,7 +437,9 @@ class BitcoindWallet:
         """Lock the output with `lockunspent`.
 
         :raises TypeError: its `tx_id` is not bytes (`_txid_hex`).
-        :raises ValueError: its `tx_id` is not 32 bytes (`_txid_hex`).
+        :raises ValueError: its `tx_id` is not 32 bytes (`_txid_hex`), or
+            Core refused the call (`_by_code`).
+        :raises RuntimeError: the call failed otherwise (`_by_code`).
         """
         txid = _txid_hex(outpoint.tx_id)
         self._call("lockunspent", [False, [{"txid": txid, "vout": outpoint.vout}]])
@@ -436,18 +454,30 @@ class BitcoindWallet:
             refusal carries no secret* of the organization's standard.
             Before Core sees it, an id that is not 32 bytes is refused
             too, and one that is not bytes raises `TypeError` (`_txid_hex`).
+        :raises RuntimeError: Core answered another code, which refuses no
+            transaction, or the call failed otherwise. The message names
+            the code, or the exception's type, alone, as `_by_code` does.
         """
         hex_txid = _txid_hex(txid)
+        # outside the `try`: the sync is at the node's endpoint, as in `_call`
+        self._sync()
+        refusal: Exception
         try:
-            self._call("abandontransaction", [hex_txid])
+            self.rpc.call("abandontransaction", [hex_txid])
         except RpcError as exc:
-            if exc.code != _RPC_INVALID_ADDRESS_OR_KEY:
-                raise
+            code = _code(exc.code)
+            if code == _RPC_INVALID_ADDRESS_OR_KEY:
+                err_msg = "not abandoned: Core answered RPC_INVALID_ADDRESS_OR_KEY"
+                refusal = ValueError(err_msg)
+            else:
+                refusal = RuntimeError(f"abandontransaction failed: code {code}")
+        # any other failure of a call at the wallet's endpoint may name it
+        except Exception as exc:  # noqa: BLE001
+            refusal = RuntimeError(f"abandontransaction raised {type(exc).__name__}")
         else:
             return
-        # raised here, outside the `except` block, so it chains no RPC error
-        err_msg = "not abandoned: Core answered RPC_INVALID_ADDRESS_OR_KEY"
-        raise ValueError(err_msg)
+        # raised here, outside the `except` blocks, so it has no context
+        raise refusal
 
     def unload(self) -> None:
         """Unload the wallet with `unloadwallet`, and off the startup list.
