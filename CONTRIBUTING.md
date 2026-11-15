@@ -52,9 +52,11 @@ long after the branch is gone.
 
 ## Working with an LLM
 
-**Development here is LLM-based.** Most issues, code and reviews are
-written by agentic sessions that the maintainer directs and reads.
-Humans are welcome, as long as they are comfortable working that way.
+**Your agents are welcome.** Use them to solve the open issues and to
+review the open pull requests. There is no cap on how many pull requests
+you open, and no rule to disclose an agent's part: every change is held
+to the same review, whoever or whatever wrote it, as the rest of this
+file and `REVIEWING.md` say.
 
 **A contribution is yours, whoever wrote it.** Read every line before
 you open the pull request, understand it, and be ready to answer a
@@ -142,9 +144,12 @@ It is opened the moment it is written and verified — not held for the
 previous one to be reviewed or to land, and not batched with the next. A
 batch arrives as one reviewing job with several subjects, which is the
 shape that costs the most to read; a finished pull request held back is
-review that could have started and did not. A security advisory's fix is
-the exception, held back as [section 12][s12]'s *A security advisory is
-worked in this order* says.
+review that could have started and did not. A port of the standard is
+one subject: one pull request per tree, holding every change to the
+standard landed since that tree's last port. Its review asks one
+question: does each copy now match the standard's source? A security
+advisory's fix is the exception, held back as [section 12][s12]'s *A
+security advisory is worked in this order* says.
 
 Working this way stacks branches, which is fine and costs one rule: a
 child whose base was amended is moved with the old base named,

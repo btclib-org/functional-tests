@@ -23,7 +23,10 @@ permissions:
   contents: read
 
 concurrency:
-  group: docs-${{ github.event.pull_request.number || github.ref }}
+  group: >-
+    docs-${{ github.event_name == 'push'
+    && format('{0}-{1}', github.sha, github.ref)
+    || github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
