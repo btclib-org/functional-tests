@@ -22,7 +22,7 @@ of them. This tree publishes no package: *Publishing* below says what
 is absent. *Read the Docs* below records the project the docs build on.
 
 Each section carries the command that sets its setting and the command
-that reads it back, and the `#` lines under a read-back are what it
+that reads it back, and the fence under a read-back holds what it
 printed on 2026-09-25 — section 16's last step — unless a later date
 stands beside it. Section 11 makes such an answer documentation, with a
 reader as its check: nothing re-runs these commands, so an answer that
@@ -36,12 +36,27 @@ before 2026-10-31 ran under the first. Read back on 2026-11-02:
 
 ```shell
 gh api repos/btclib-org/bitcoin-node-tests --jq .full_name
-# btclib-org/functional-tests
+```
+
+```text
+btclib-org/functional-tests
+```
+
+```shell
 gh api repos/btclib-org/btclib-functional-tests --jq .full_name
-# btclib-org/functional-tests
+```
+
+```text
+btclib-org/functional-tests
+```
+
+```shell
 gh api repos/btclib-org/functional-tests --jq '{name, description}'
-# {"description":"Bitcoin Core's functional tests rewritten on btclib,
-#  with bitcoind as the oracle","name":"functional-tests"}
+```
+
+```text
+{"description":"Bitcoin Core's functional tests rewritten on btclib,
+ with bitcoind as the oracle","name":"functional-tests"}
 ```
 
 The name and the calls that follow stand in blocks of their own. The
@@ -86,22 +101,38 @@ Read back:
 gh api repos/btclib-org/functional-tests \
   --jq '{visibility, default_branch: .default_branch, has_issues,
          wiki: .has_wiki, projects: .has_projects}'
-# {"default_branch":"main","has_issues":true,"projects":false,
-#  "visibility":"public","wiki":false}
+```
+
+```json
+{"default_branch":"main","has_issues":true,"projects":false,
+ "visibility":"public","wiki":false}
+```
+
+Read on 2026-11-15, the Pages call prints the body of its `404` and
+then `gh`'s own message, on one line wrapped here:
+
+```shell
 gh api repos/btclib-org/functional-tests/pages
-# {"message":"Not Found", ...}, gh: Not Found (HTTP 404)
+```
+
+```text
+{"message":"Not Found",
+ "documentation_url":"https://docs.github.com/rest/pages/pages#get-a-apiname-pages-site",
+ "status":"404"}gh: Not Found (HTTP 404)
+```
+
+```shell
 diff <(gh api repos/btclib-org/functional-tests --jq .homepage) \
      <(sed -n '/^\[project.urls\]/,/^\[/p' pyproject.toml \
        | sed -n 's/^homepage = "\(.*\)"$/\1/p')
-# (empty)
 ```
 
 `has_issues` is what `CONTRIBUTING.md`'s *The issue tracker* rests on,
 and so does `.github/ISSUE_TEMPLATE/`. The Pages call is expected to
 answer `404`: this tree serves no GitHub Pages site, and a recorded `404`
 is what makes a later flip visible. The `diff` compares `.homepage` with
-`pyproject.toml`'s `[project.urls] homepage`, and is expected empty; it
-was read on 2026-11-05.
+`pyproject.toml`'s `[project.urls] homepage`, and is expected empty: read
+on 2026-11-05, it printed nothing.
 
 ## Required checks on main
 
@@ -193,7 +224,8 @@ JSON
 The body arrives on stdin because `-f` sends every value as a string,
 where the endpoint types `app_id` as an integer.
 
-Read back:
+Read back on 2026-11-05T07:17:35Z, after `sourcery / Sourcery` was
+added:
 
 ```shell
 gh api repos/btclib-org/functional-tests/branches/main/protection \
@@ -204,17 +236,19 @@ gh api repos/btclib-org/functional-tests/branches/main/protection \
          enforce_admins: .enforce_admins.enabled,
          linear: .required_linear_history.enabled,
          conversation: .required_conversation_resolution.enabled}'
-# (Read on 2026-11-05T07:17:35Z, after sourcery / Sourcery was added.)
-# {"checks":[["test: every job passed",15368],
-#            ["docs / Build the documentation",15368],
-#            ["lint / Lint and type-check",15368],
-#            ["bitcoind / Regtest against Bitcoin Core",15368],
-#            ["lint / Dependency review",15368],
-#            ["lint / Sign-off",15368],
-#            ["sourcery / Sourcery",15368]],
-#  "conversation":true,"enforce_admins":false,"linear":true,
-#  "reviews":{"dismiss_stale_reviews":true,
-#             "required_approving_review_count":1},"strict":false}
+```
+
+```json
+{"checks":[["test: every job passed",15368],
+           ["docs / Build the documentation",15368],
+           ["lint / Lint and type-check",15368],
+           ["bitcoind / Regtest against Bitcoin Core",15368],
+           ["lint / Dependency review",15368],
+           ["lint / Sign-off",15368],
+           ["sourcery / Sourcery",15368]],
+ "conversation":true,"enforce_admins":false,"linear":true,
+ "reviews":{"dismiss_stale_reviews":true,
+            "required_approving_review_count":1},"strict":false}
 ```
 
 `bitcoind / Regtest against Bitcoin Core`, `lint / Dependency review`,
@@ -237,20 +271,23 @@ gh api -X PATCH "$branch"/protection/required_status_checks \
 JSON
 ```
 
-Read back:
+Read back on 2026-11-05T07:17:35Z, after `sourcery / Sourcery` was
+added:
 
 ```shell
 gh api "$branch"/protection/required_status_checks \
   --jq '{checks: [.checks[] | [.context, .app_id]], strict}'
-# (Read on 2026-11-05T07:17:35Z, after sourcery / Sourcery was added.)
-# {"checks":[["test: every job passed",15368],
-#            ["docs / Build the documentation",15368],
-#            ["lint / Lint and type-check",15368],
-#            ["bitcoind / Regtest against Bitcoin Core",15368],
-#            ["lint / Dependency review",15368],
-#            ["lint / Sign-off",15368],
-#            ["sourcery / Sourcery",15368]],
-#  "strict":false}
+```
+
+```json
+{"checks":[["test: every job passed",15368],
+           ["docs / Build the documentation",15368],
+           ["lint / Lint and type-check",15368],
+           ["bitcoind / Regtest against Bitcoin Core",15368],
+           ["lint / Dependency review",15368],
+           ["lint / Sign-off",15368],
+           ["sourcery / Sourcery",15368]],
+ "strict":false}
 ```
 
 Three rulesets sit beside it, additive — rules aggregate across rulesets
@@ -303,7 +340,10 @@ Read on 2026-10-15:
 ```shell
 gh api repos/btclib-org/functional-tests/branches/main/protection \
   --jq '.required_signatures.enabled'
-# false
+```
+
+```text
+false
 ```
 
 So nothing refuses an unsigned commit at the push.
@@ -344,16 +384,19 @@ for id in $(gh api repos/btclib-org/functional-tests/rulesets \
            methods: [.rules[] | select(.type=="pull_request")
                               | .parameters.allowed_merge_methods]}'
 done
-# {"bypass":[],"enforcement":"active","include":["refs/heads/main"],
-#  "methods":[],"name":"main-integrity",
-#  "rules":["required_linear_history","non_fast_forward","deletion"],
-#  "target":"branch"}
-# {"bypass":[[3296421,"pull_request"]],"enforcement":"active",
-#  "include":["refs/heads/main"],"methods":[["squash"]],
-#  "name":"main-self-merge","rules":["pull_request"],"target":"branch"}
-# {"bypass":[],"enforcement":"active","include":["refs/tags/v*"],
-#  "methods":[],"name":"tag-integrity","rules":["required_signatures"],
-#  "target":"tag"}
+```
+
+```text
+{"bypass":[],"enforcement":"active","include":["refs/heads/main"],
+ "methods":[],"name":"main-integrity",
+ "rules":["required_linear_history","non_fast_forward","deletion"],
+ "target":"branch"}
+{"bypass":[[3296421,"pull_request"]],"enforcement":"active",
+ "include":["refs/heads/main"],"methods":[["squash"]],
+ "name":"main-self-merge","rules":["pull_request"],"target":"branch"}
+{"bypass":[],"enforcement":"active","include":["refs/tags/v*"],
+ "methods":[],"name":"tag-integrity","rules":["required_signatures"],
+ "target":"tag"}
 ```
 
 A `v*` tag push that brings an unsigned commit is refused. A tag on a
@@ -372,11 +415,14 @@ gh api repos/btclib-org/functional-tests \
   --jq '{allow_squash_merge, allow_merge_commit, allow_rebase_merge,
          allow_auto_merge, squash_merge_commit_title,
          squash_merge_commit_message, delete_branch_on_merge}'
-# {"allow_auto_merge":false,"allow_merge_commit":false,
-#  "allow_rebase_merge":false,"allow_squash_merge":true,
-#  "delete_branch_on_merge":true,
-#  "squash_merge_commit_message":"COMMIT_MESSAGES",
-#  "squash_merge_commit_title":"COMMIT_OR_PR_TITLE"}
+```
+
+```json
+{"allow_auto_merge":false,"allow_merge_commit":false,
+ "allow_rebase_merge":false,"allow_squash_merge":true,
+ "delete_branch_on_merge":true,
+ "squash_merge_commit_message":"COMMIT_MESSAGES",
+ "squash_merge_commit_title":"COMMIT_OR_PR_TITLE"}
 ```
 
 Read on 2026-11-14T15:29Z.
@@ -410,8 +456,11 @@ value it gets:
 ```shell
 gh api repos/btclib-org/functional-tests/actions/permissions/workflow \
   --jq '{default_workflow_permissions, can_approve_pull_request_reviews}'
-# {"can_approve_pull_request_reviews":false,
-#  "default_workflow_permissions":"read"}
+```
+
+```json
+{"can_approve_pull_request_reviews":false,
+ "default_workflow_permissions":"read"}
 ```
 
 The expected answer is `read` and `false`. Where it is not, the
@@ -424,10 +473,19 @@ Read on 2026-09-27:
 
 ```shell
 gh api repos/btclib-org/functional-tests/actions/permissions
-# {"enabled":true,"allowed_actions":"all","sha_pinning_required":true}
+```
+
+```json
+{"enabled":true,"allowed_actions":"all","sha_pinning_required":true}
+```
+
+```shell
 gh api orgs/btclib-org/actions/permissions \
   --jq '{allowed_actions, sha_pinning_required}'
-# {"allowed_actions":"all","sha_pinning_required":true}
+```
+
+```json
+{"allowed_actions":"all","sha_pinning_required":true}
 ```
 
 The organization gives the same two answers, `sha_pinning_required`
@@ -438,9 +496,18 @@ fields](https://github.com/btclib-org/.github/blob/main/README.md#tokens-publish
 
 ```shell
 gh api repos/btclib-org/functional-tests --jq .web_commit_signoff_required
-# true
+```
+
+```text
+true
+```
+
+```shell
 gh api orgs/btclib-org --jq .web_commit_signoff_required
-# true
+```
+
+```text
+true
 ```
 
 Set at the organization level, [for the reason section 11
@@ -461,7 +528,10 @@ neither is recorded:
 
 ```shell
 gh api repos/btclib-org/functional-tests/environments --jq .total_count
-# 0
+```
+
+```text
+0
 ```
 
 Each would arrive with `release.yml`, in the pull request that adds the
@@ -479,17 +549,38 @@ back on 2026-11-02:
 ```shell
 p=https://app.readthedocs.org/api/v3/projects/btclib-functional-tests
 curl -s "$p/" | jq -c '{default_branch, default_version, repository: .repository.url}'
-# {"default_branch":"main","default_version":"latest",
-#  "repository":"https://github.com/btclib-org/functional-tests.git"}
+```
+
+```json
+{"default_branch":"main","default_version":"latest",
+ "repository":"https://github.com/btclib-org/functional-tests.git"}
+```
+
+```shell
 curl -s "$p/versions/?active=true" \
   | jq -c '.results[] | [.slug, .type, .identifier]'
-# ["latest","branch","main"]
+```
+
+```json
+["latest","branch","main"]
+```
+
+```shell
 curl -s "$p/builds/35547358/?expand=config" \
   | jq -c '{commit, success, python: .config.build.tools.python}'
-# {"commit":"d6def10b5f97133d460a2ceb4bb04e0dc9e4ea7f","success":true,
-#  "python":{"full_version":"3.14.6","version":"latest"}}
+```
+
+```json
+{"commit":"d6def10b5f97133d460a2ceb4bb04e0dc9e4ea7f","success":true,
+ "python":{"full_version":"3.14.6","version":"latest"}}
+```
+
+```shell
 gh api repos/btclib-org/functional-tests/hooks --jq length
-# 0
+```
+
+```text
+0
 ```
 
 The former slug, `bitcoin-node-tests`, redirects its pages to this
@@ -498,9 +589,12 @@ project's. Read back on 2026-10-31:
 ```shell
 curl -sI https://bitcoin-node-tests.readthedocs.io/en/latest/index.html \
   | grep -i -E '^(HTTP|location|x-rtd-redirect)'
-# HTTP/2 301
-# location: https://btclib-functional-tests.readthedocs.io/en/latest/index.html
-# x-rtd-redirect: user
+```
+
+```text
+HTTP/2 301
+location: https://btclib-functional-tests.readthedocs.io/en/latest/index.html
+x-rtd-redirect: user
 ```
 
 `stable` is absent from the active versions for the reason
@@ -519,7 +613,10 @@ interpreter that `.python-version` does:
 ```shell
 curl -s https://app.readthedocs.org/api/v2/build/35547358/ \
   | jq -r '.commands[].output' | grep 'Using CPython'
-# Using CPython 3.12.3 interpreter at: /usr/bin/python3.12
+```
+
+```text
+Using CPython 3.12.3 interpreter at: /usr/bin/python3.12
 ```
 
 Nothing here waits on Read the Docs reaching a newer `"latest"`.
@@ -556,22 +653,55 @@ Read back:
 
 ```shell
 gh api repos/btclib-org/functional-tests --jq '.security_and_analysis'
-# {"dependabot_security_updates":{"status":"enabled"},
-#  "secret_scanning":{"status":"enabled"},
-#  "secret_scanning_non_provider_patterns":{"status":"disabled"},
-#  "secret_scanning_push_protection":{"status":"enabled"},
-#  "secret_scanning_validity_checks":{"status":"disabled"}}
+```
+
+```json
+{"dependabot_security_updates":{"status":"enabled"},
+ "secret_scanning":{"status":"enabled"},
+ "secret_scanning_non_provider_patterns":{"status":"disabled"},
+ "secret_scanning_push_protection":{"status":"enabled"},
+ "secret_scanning_validity_checks":{"status":"disabled"}}
+```
+
+```shell
 gh api -i repos/btclib-org/functional-tests/vulnerability-alerts | head -1
-# HTTP/2.0 204 No Content
+```
+
+```text
+HTTP/2.0 204 No Content
+```
+
+```shell
 gh api repos/btclib-org/functional-tests/automated-security-fixes
-# {"enabled":true,"paused":false}
+```
+
+```json
+{"enabled":true,"paused":false}
+```
+
+```shell
 gh api repos/btclib-org/functional-tests/private-vulnerability-reporting
-# {"enabled":true}
+```
+
+```json
+{"enabled":true}
+```
+
+```shell
 gh api repos/btclib-org/functional-tests/code-scanning/default-setup \
   --jq .state
-# not-configured
+```
+
+```text
+not-configured
+```
+
+```shell
 gh api repos/btclib-org/functional-tests/code-quality/setup --jq .state
-# not-configured
+```
+
+```text
+not-configured
 ```
 
 The alerts endpoint has no body and answers with its status, 204 for
@@ -592,14 +722,13 @@ sed -n '/^keywords = \[/,/^]/s/^ *"\(.*\)",$/\1/p' pyproject.toml \
 ```
 
 Read back, and compared, sorted because GitHub returns topics in an order
-of its own; the diff is expected empty:
+of its own; the diff is expected empty, and printed nothing:
 
 ```shell
 diff <(gh api repos/btclib-org/functional-tests --jq '.topics[]' \
        | sort) \
      <(sed -n '/^keywords = \[/,/^]/s/^ *"\(.*\)",$/\1/p' pyproject.toml \
        | sort)
-# (empty)
 ```
 
 The keywords, in order: `bitcoin`, `bitcoin-core`, `conformance-testing`,
@@ -614,7 +743,10 @@ configures, so prose that needs the reasoning — a workflow header,
 
 ```shell
 gh api orgs/btclib-org --jq .plan.name
-# free
+```
+
+```text
+free
 ```
 
 [GitHub's own table](https://docs.github.com/en/actions/reference/limits)
@@ -651,9 +783,18 @@ either would be that decision undone:
 
 ```shell
 gh api repos/btclib-org/functional-tests/actions/secrets --jq .total_count
-# 0
+```
+
+```text
+0
+```
+
+```shell
 gh api repos/btclib-org/functional-tests/dependabot/secrets --jq .total_count
-# 0
+```
+
+```text
+0
 ```
 
 **A switch this repository does not set.** `claude-review.yml` calls
@@ -664,5 +805,8 @@ store is read too:
 
 ```shell
 gh api repos/btclib-org/functional-tests/actions/variables --jq .total_count
-# 0
+```
+
+```text
+0
 ```
