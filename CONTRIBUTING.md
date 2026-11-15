@@ -636,7 +636,7 @@ directory a Core developer can find rather than one of the numbered
 `--tracerpc`: a `--tracerpc` flag on `tests/integration`'s own
 collection wraps every adapter's RPC transport
 (`bitcoin_core_rpc.BitcoinCoreRpcClient`'s own `transport=`) and prints
-each request and reply as it is made, matching Core's own wording. An
+each call as it is made, as `node.traced_transport`'s docstring says. An
 adapter reads the flag only through its own `trace_rpc`, so every one a
 test builds goes through the `make_adapter` fixture beside the option,
 and `tests/tracerpc_reach_test.py` fails on a construction that goes

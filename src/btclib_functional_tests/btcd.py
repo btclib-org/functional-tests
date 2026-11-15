@@ -292,7 +292,8 @@ class BtcdAdapter(NodeAdapter):
     def _rpc_transport(self) -> HttpTransport:
         """Return the base transport, its replies through `_v2_replies`.
 
-        Wrapped outside the trace, so `--tracerpc` prints what btcd sent.
+        Wrapped outside the trace, so `--tracerpc` prints the length of btcd's
+        own reply.
         """
         return _v2_replies(super()._rpc_transport())
 

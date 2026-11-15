@@ -310,7 +310,7 @@ def test_trace_rpc_prints_over_the_kept_connection(
     finally:
         adapter.stop()
     assert server.accepted == 1
-    assert capsys.readouterr().out.count("getblockcount") == 4
+    assert capsys.readouterr().out.count(" getblockcount\n<-- 200 ") == 2
 
 
 def test_thread_sessions_hands_each_call_its_timeout() -> None:

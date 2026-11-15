@@ -172,7 +172,7 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         "--tracerpc",
         action="store_true",
         default=False,
-        help="print every RPC call this suite's adapters make, and its reply",
+        help="print the method of every RPC call this suite's adapters make",
     )
     parser.addoption(
         "--timeout-factor",
