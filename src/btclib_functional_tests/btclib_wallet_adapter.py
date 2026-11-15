@@ -204,7 +204,8 @@ class NodeBackend:
         chain, where a block may have spent it. `gettxout` reads the
         chain's coin with the mempool left out, so a spend there does not
         hide it. Its transaction is then read in the block its
-        confirmations name, on the tip `gettxout` read.
+        confirmations name, and the tip is still the one `gettxout` read
+        once that read is done.
 
         :raises btclib_wallet.exceptions.FetchError: the node answered a
             transaction other than the one asked, the tip moved meanwhile,
@@ -228,10 +229,6 @@ class NodeBackend:
             return None
         tip = rpc.call("getblockheader", [coin["bestblock"]])["height"]
         block = rpc.call("getblockhash", [tip - coin["confirmations"] + 1])
-        if rpc.call("getbestblockhash", []) != coin["bestblock"]:
-            # the height may name a block of another chain
-            err_msg = "transaction: the tip moved while its block was found"
-            raise FetchError(err_msg)
         try:
             raw = rpc.call("getrawtransaction", [txid, False, block])
         except RpcError as exc:
@@ -240,6 +237,11 @@ class NodeBackend:
                 raise
             err_msg = "transaction: its block is not available"
             raise FetchError(err_msg) from exc
+        # after the last read: the coin `gettxout` answered is the UTXO set's
+        # at that tip, and a block may since have spent it or left the chain
+        if rpc.call("getbestblockhash", []) != coin["bestblock"]:
+            err_msg = "transaction: the tip moved while its block was read"
+            raise FetchError(err_msg)
         return tx_from_raw(bytes.fromhex(raw), txid, network)
 
 

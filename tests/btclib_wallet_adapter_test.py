@@ -1048,8 +1048,8 @@ def test_node_backend_reads_a_chain_coin_s_transaction_in_its_block() -> None:
         ("gettxout", [txid, 0, False]),
         ("getblockheader", ["aa" * 32]),
         ("getblockhash", [6]),
-        ("getbestblockhash", []),
         ("getrawtransaction", [txid, False, "bb" * 32]),
+        ("getbestblockhash", []),
     ]
 
 
@@ -1103,14 +1103,21 @@ def test_node_backend_refuses_another_transaction_in_the_block() -> None:
         _coin_parent(node, OutPoint(parent.id, 0))
 
 
-def test_node_backend_refuses_a_block_found_while_the_tip_moved() -> None:
-    """The height `gettxout`'s tip names may be another chain's block."""
+def test_node_backend_refuses_a_block_read_while_the_tip_moved() -> None:
+    """The tip is checked after the block read, the last of the reads.
+
+    A block since `gettxout` may have spent its coin, or left the chain
+    with the block read.
+    """
     parent = _payment(_ADDRESS)
     node = _CoinNode(parent, _COIN)
     node.answers["getbestblockhash"] = "dd" * 32
     with pytest.raises(FetchError, match="the tip moved"):
         _coin_parent(node, OutPoint(parent.id, 0))
-    assert node.calls[-1] == ("getbestblockhash", [])
+    assert node.calls[-2:] == [
+        ("getrawtransaction", [parent.id.hex(), False, "bb" * 32]),
+        ("getbestblockhash", []),
+    ]
 
 
 def test_node_backend_refuses_a_coin_whose_block_is_not_available() -> None:
