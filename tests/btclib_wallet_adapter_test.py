@@ -1113,12 +1113,12 @@ def test_node_backend_refuses_a_block_found_while_the_tip_moved() -> None:
     assert node.calls[-1] == ("getbestblockhash", [])
 
 
-def test_node_backend_refuses_a_coin_whose_block_is_pruned() -> None:
-    """`gettxout` holds the coin, and the node no longer the block."""
+def test_node_backend_refuses_a_coin_whose_block_is_not_available() -> None:
+    """`gettxout` holds the coin, and the node not its block: pruned, say."""
     parent = _payment(_ADDRESS)
     node = _CoinNode(parent, _COIN)
     node.in_block = RpcError("Block not available", -1)
-    with pytest.raises(FetchError, match="pruned"):
+    with pytest.raises(FetchError, match="block is not available"):
         _coin_parent(node, OutPoint(parent.id, 0))
 
 

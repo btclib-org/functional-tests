@@ -36,9 +36,10 @@ What differs from bitcoind's wallet here is the ledger's:
 - a descriptor imported with a WIF is watch-only: btclib-wallet's
   descriptor parser keeps the private key of an extended key, and of no
   other (`descriptors.parse`);
-- `sign` refuses an input whose coin is in a block the node pruned:
-  btclib-wallet's signer asks every input's previous transaction (its
-  psbt's `non_witness_utxo`), where Core's wallet reads the coin alone.
+- `sign` refuses an input whose coin is in a block the node pruned: it
+  reads each input's previous transaction, which btclib-wallet's signer
+  asks for (its psbt's `non_witness_utxo`), where Core's wallet reads the
+  coin alone.
 """
 
 from __future__ import annotations
@@ -157,7 +158,8 @@ class ChainBackend(Protocol):
         holds it.
 
         :raises btclib_wallet.exceptions.FetchError: the node holds the
-            coin and cannot give the transaction paying it.
+            coin, and does not give the transaction paying it, or gives
+            another.
         """
         ...
 
@@ -204,8 +206,9 @@ class NodeBackend:
         hide it. Its transaction is then read in the block its
         confirmations name, on the tip `gettxout` read.
 
-        :raises btclib_wallet.exceptions.FetchError: the tip moved
-            meanwhile, or the node pruned that block.
+        :raises btclib_wallet.exceptions.FetchError: the node answered a
+            transaction other than the one asked, the tip moved meanwhile,
+            or that block is not available.
         """
         rpc = self._node.rpc
         txid = tx_id_hex(outpoint.tx_id)
@@ -235,7 +238,7 @@ class NodeBackend:
             # -1: "Block not available"
             if exc.code != RPCErrorCode.MISC_ERROR:
                 raise
-            err_msg = "transaction: its block is pruned"
+            err_msg = "transaction: its block is not available"
             raise FetchError(err_msg) from exc
         return tx_from_raw(bytes.fromhex(raw), txid, network)
 
@@ -472,8 +475,8 @@ class BtclibWallet:
         :raises ValueError: an input is left unsigned, or keeps a signature
             that does not verify.
         :raises btclib_wallet.exceptions.FetchError: from
-            `ChainBackend.get_coin_parent`: the node holds an input's coin
-            and cannot give its transaction.
+            `ChainBackend.get_coin_parent`: the node holds an input's coin,
+            and does not give the transaction paying it, or gives another.
         """
         # `Psbt.from_tx` empties the inputs of the transaction it is given
         unsigned = Tx.parse(tx.serialize(include_witness=False, check_validity=False))
