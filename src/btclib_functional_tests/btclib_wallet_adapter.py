@@ -50,6 +50,8 @@ from collections.abc import Set as AbstractSet
 from pathlib import Path
 from typing import Protocol
 
+from bip32_descriptors.bip32.bip32 import rootxprv_from_seed
+from bip32_descriptors.descriptors.descriptors import add_checksum
 from bitcoin_core_rpc import RpcError, RPCErrorCode
 from btclib.alias import Octets
 from btclib.exceptions import BTClibValueError
@@ -65,8 +67,6 @@ from btclib.script.script_pub_key import ScriptPubKey
 from btclib.script.sig_hash import PrecomputedTxData
 from btclib.script.witness import Witness
 from btclib.tx import OutPoint, Tx, TxOut
-from btclib_wallet.bip32.bip32 import rootxprv_from_seed
-from btclib_wallet.descriptors.descriptors import add_checksum
 from btclib_wallet.exceptions import FetchError
 from btclib_wallet.fetch.bitcoin_core import BitcoinCoreFetcher
 from btclib_wallet.fetch.fetcher import tx_for_network, tx_from_raw, tx_id_hex
