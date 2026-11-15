@@ -684,27 +684,83 @@ def test_a_thrown_import_error_is_refused_with_its_code_alone() -> None:
 def test_a_refused_abandon_names_the_code_and_not_the_transaction() -> None:
     """A key given as the id is in no text of the refusal; nothing chained.
 
-    Core's message here quotes it too, and is not relayed.
+    Core's message here quotes it too, and is not relayed, nor is the
+    wallet's name, a WIF, which the client's text holds.
     """
     key = (7).to_bytes(32, "big")
     error = {"code": -5, "message": f"Transaction not eligible: {key.hex()}"}
     node = _ClientNode(_client(error, "abandontransaction"))
-    wallet = BitcoindWallet(cast("NodeAdapter", node), _NAME)
+    wallet = BitcoindWallet(cast("NodeAdapter", node), _WIF)
     with pytest.raises(
         ValueError, match="^not abandoned: Core answered RPC_INVALID_ADDRESS_OR_KEY$"
     ) as excinfo:
         wallet.abandon(key)
-    _assert_no_key(excinfo.value, (key.hex(), key[::-1].hex(), repr(key)))
+    _assert_no_key(excinfo.value, (key.hex(), key[::-1].hex(), repr(key), _WIF))
 
 
-def test_any_other_error_of_abandon_is_raised_as_it_comes() -> None:
-    """A code other than `RPC_INVALID_ADDRESS_OR_KEY` is not a refusal."""
+def test_any_other_code_of_abandon_is_no_refusal_and_names_the_code_alone() -> None:
+    """A code other than `RPC_INVALID_ADDRESS_OR_KEY` raises no `ValueError`.
+
+    The client's text names the endpoint, whose path holds the wallet's
+    name, a WIF: it is not relayed.
+    """
     error = {"code": -1, "message": "boom"}
     node = _ClientNode(_client(error, "abandontransaction"))
-    wallet = BitcoindWallet(cast("NodeAdapter", node), _NAME)
-    with pytest.raises(RpcError) as excinfo:
+    wallet = BitcoindWallet(cast("NodeAdapter", node), _WIF)
+    with pytest.raises(
+        RuntimeError, match="^abandontransaction failed: code -1$"
+    ) as excinfo:
         wallet.abandon(bytes.fromhex(_TXID))
-    assert excinfo.value.code == -1
+    _assert_no_key(excinfo.value)
+
+
+def test_any_other_failure_of_abandon_names_its_type_alone() -> None:
+    """An error object the client cannot read, and quotes, is not relayed."""
+    node = _ClientNode(_client(_WIF, "abandontransaction"))
+    wallet = BitcoindWallet(cast("NodeAdapter", node), _WIF)
+    with pytest.raises(
+        RuntimeError, match="^abandontransaction raised FetchError$"
+    ) as excinfo:
+        wallet.abandon(bytes.fromhex(_TXID))
+    _assert_no_key(excinfo.value)
+
+
+# the methods calling at the wallet's endpoint through `_call`, by the
+# method each sends there, but `spend`, whose `send` has tests of its own
+_AT_THE_WALLET: dict[str, Callable[[BitcoindWallet], object]] = {
+    "getnewaddress": BitcoindWallet.new_address,
+    "getrawchangeaddress": BitcoindWallet.new_change_address,
+    "getbalance": BitcoindWallet.balance,
+    "getbalances": BitcoindWallet.balances,
+    "listunspent": BitcoindWallet.utxos,
+    "gettransaction": lambda wallet: wallet.transaction(bytes.fromhex(_TXID)),
+    "getwalletinfo": BitcoindWallet.tip,
+    "signrawtransactionwithwallet": lambda wallet: wallet.sign(_tx()),
+    "lockunspent": lambda wallet: wallet.lock(OutPoint(bytes.fromhex(_TXID), 0)),
+}
+
+
+@pytest.mark.parametrize("method", _AT_THE_WALLET)
+def test_a_refusal_at_the_wallet_s_endpoint_names_the_code_alone(method: str) -> None:
+    """The endpoint the client's text names holds the wallet's name, a WIF."""
+    error = {"code": -3, "message": "Wrong type passed"}
+    node = _ClientNode(_client(error, method))
+    wallet = BitcoindWallet(cast("NodeAdapter", node), _WIF)
+    with pytest.raises(ValueError, match=f"^{method} refused: code -3$") as excinfo:
+        _AT_THE_WALLET[method](wallet)
+    _assert_no_key(excinfo.value)
+
+
+@pytest.mark.parametrize("method", _AT_THE_WALLET)
+def test_any_other_failure_at_the_wallet_s_endpoint_names_its_type_alone(
+    method: str,
+) -> None:
+    """An error object the client cannot read, and quotes, is not relayed."""
+    node = _ClientNode(_client(_WIF, method))
+    wallet = BitcoindWallet(cast("NodeAdapter", node), _WIF)
+    with pytest.raises(RuntimeError, match=f"^{method} raised FetchError$") as excinfo:
+        _AT_THE_WALLET[method](wallet)
+    _assert_no_key(excinfo.value)
 
 
 def test_any_other_failure_of_the_import_names_its_type_alone() -> None:
