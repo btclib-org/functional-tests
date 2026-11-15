@@ -60,7 +60,7 @@ from btclib.tx.limits import COINBASE_MATURITY
 
 from btclib_functional_tests.capability import Capability, require
 from btclib_functional_tests.mini_wallet import MiniWallet, nulldata_script_pub_key
-from tests.integration.script_verify_flag_test import bitcoind_version
+from tests.integration.support.script_verify_flag import bitcoind_version
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence

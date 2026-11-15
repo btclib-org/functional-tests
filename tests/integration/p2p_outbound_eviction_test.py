@@ -63,7 +63,7 @@ from btclib.p2p import GetHeaders, Headers
 
 from btclib_functional_tests.capability import Capability, require
 from btclib_functional_tests.peer import Listener
-from tests.integration.p2p_conns_test import Clock
+from tests.integration.support.p2p_conns import Clock
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence

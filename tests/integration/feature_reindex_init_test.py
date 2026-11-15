@@ -50,7 +50,7 @@ import pytest
 
 from btclib_functional_tests.capability import Capability, require
 from btclib_functional_tests.node import free_ports, wait_until
-from tests.integration.script_verify_flag_test import bitcoind_version
+from tests.integration.support.script_verify_flag import bitcoind_version
 
 if TYPE_CHECKING:
     from pathlib import Path

@@ -92,7 +92,7 @@ from btclib_functional_tests.bitcoind import BitcoindAdapter
 from btclib_functional_tests.capability import Capability, require
 from btclib_functional_tests.debug_log import assert_debug_log
 from btclib_functional_tests.socks5 import AddressType, Socks5Proxy, Socks5Request
-from tests.integration.script_verify_flag_test import bitcoind_version
+from tests.integration.support.script_verify_flag import bitcoind_version
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence

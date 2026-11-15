@@ -32,7 +32,7 @@ Every body mines a coin to spend first (`Capability.MINE`,
 
 Core's `P2PInterface` asks for whatever a node announces, and its
 `P2PTxInvStore` records the announced transactions, from its framework's
-network thread. Here `RelayConn` (`p2p_conns_test.py`) does both on the
+network thread. Here `RelayConn` (`support/p2p_conns.py`) does both on the
 test's own thread, where a wait reads the peer's connection: a check
 that a peer was not announced a transaction reads it up to the `pong`
 answering the second of two `ping`s, the node running its own send loop
@@ -71,7 +71,7 @@ from btclib_functional_tests.capability import Capability, require
 from btclib_functional_tests.debug_log import assert_debug_log
 from btclib_functional_tests.mini_wallet import MiniWallet
 from btclib_functional_tests.node import wait_until
-from tests.integration.p2p_conns_test import RelayConn
+from tests.integration.support.p2p_conns import RelayConn
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence

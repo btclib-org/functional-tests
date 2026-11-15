@@ -51,13 +51,13 @@ block download, where a node ignores every transaction announced to it.
 
 Core builds a transaction with no witness, whose txid is its wtxid,
 with a `MiniWalletMode.RAW_P2PK` wallet: here `mine_p2pk_coins`
-(`p2pk_coins_test.py`) mines coinbases paying `RAW_P2PK_SCRIPT_PUB_KEY`
+(`support/p2pk_coins.py`) mines coinbases paying `RAW_P2PK_SCRIPT_PUB_KEY`
 ahead of the wallet's own, so that they mature with its coins, and
 `raw_p2pk_script_sig` (`mini_wallet.py`) signs every spend of one.
 
 Core's `PeerTxRelayer` records each `getdata` from its framework's
 network thread, and its `P2PInterface` asks for whatever the node
-announces. Here `RelayConn` (`p2p_conns_test.py`) does both on the test's
+announces. Here `RelayConn` (`support/p2p_conns.py`) does both on the test's
 own thread, where a wait reads the peer's connection: a wait for a
 request reads the peer up to the `pong` of a ping round trip ahead of
 every poll, and a check that a peer was not asked reads it up to that
@@ -149,9 +149,9 @@ from btclib_functional_tests.mini_wallet import (
     Utxo,
 )
 from btclib_functional_tests.node import wait_until
-from tests.integration.p2p_conns_test import Clock, RelayConn
+from tests.integration.support.p2p_conns import Clock, RelayConn
 from tests.integration.p2p_private_broadcast_test import malleated_to_invalid_witness
-from tests.integration.p2pk_coins_test import (
+from tests.integration.support.p2pk_coins import (
     mine_p2pk_coins,
     p2pk_new_utxo,
     p2pk_self_transfer,

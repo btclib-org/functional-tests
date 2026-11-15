@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from tests.integration.bitcoind_adapters_test import UnboundBitcoindAdapter
+from tests.integration.support.bitcoind_adapters import UnboundBitcoindAdapter
 from tests.integration.p2p_getaddr_caching_test import (
     getaddr_answers_are_cached_per_bind,
 )

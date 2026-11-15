@@ -51,7 +51,7 @@ from btclib_functional_tests.bitcoind_wallet import BitcoindWallet
 from btclib_functional_tests.capability import Capability, require
 from btclib_functional_tests.node import connect_nodes, sync_all, wait_until_tips_agree
 from btclib_functional_tests.wallet import BlockRef, WalletCapability
-from tests.integration.script_verify_flag_test import bitcoind_version
+from tests.integration.support.script_verify_flag import bitcoind_version
 from tests.integration.wallet_signmessagewithaddress_test import refused
 
 if TYPE_CHECKING:

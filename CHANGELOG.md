@@ -1353,26 +1353,26 @@ bound use it, so a stalled wait fails with its own message (closes #309).
 
 ### The P2PK coin helpers live in one module
 
-`tests/integration/p2pk_coins_test.py` holds what `p2p_orphan_handling`,
+`tests/integration/support/p2pk_coins.py` holds what `p2p_orphan_handling`,
 `p2p_opportunistic_1p1c` and `p2p_1p1c_network` kept as private copies
 (issue #321).
 
 ### The test peers and the mock clock live in one module
 
-`tests/integration/p2p_conns_test.py` holds the test peers, their
+`tests/integration/support/p2p_conns.py` holds the test peers, their
 connection factories and the mock clock that p2p tests kept as
 private copies (issue #321).
 
 ### The bitcoind adapter that drops its own `-bind` lives in one module
 
-`tests/integration/bitcoind_adapters_test.py` holds `UnboundBitcoindAdapter`,
+`tests/integration/support/bitcoind_adapters.py` holds `UnboundBitcoindAdapter`,
 which `feature_port` and `p2p_getaddr_caching` kept as private copies
 (closes #321).
 
 ### The leftover test peers are `Conn`s
 
 p2p test helpers that repeated the receive and ping of `Conn`
-(`tests/integration/p2p_conns_test.py`) now use it (closes #362).
+(`tests/integration/support/p2p_conns.py`) now use it (closes #362).
 
 ### `[tool.uv] required-version` is `>=0.12.18`
 

@@ -93,7 +93,7 @@ from btclib_functional_tests.capability import Capability, require
 from btclib_functional_tests.debug_log import assert_debug_log
 from btclib_functional_tests.node import wait_until
 from btclib_functional_tests.peer import Peer
-from tests.integration.script_verify_flag_test import (
+from tests.integration.support.script_verify_flag import (
     bitcoind_version,
     block_script_verify_flag_failed,
 )

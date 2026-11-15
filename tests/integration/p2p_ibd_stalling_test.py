@@ -95,8 +95,8 @@ from btclib_functional_tests.debug_log import assert_debug_log
 from btclib_functional_tests.node import wait_until
 from btclib_functional_tests.peer import Listener
 from tests.integration.p2p_add_connections_test import takes_manual
-from tests.integration.p2p_conns_test import Conn
-from tests.integration.script_verify_flag_test import bitcoind_version
+from tests.integration.support.p2p_conns import Conn
+from tests.integration.support.script_verify_flag import bitcoind_version
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Collection, Mapping, Sequence

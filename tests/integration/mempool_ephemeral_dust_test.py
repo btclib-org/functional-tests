@@ -87,7 +87,7 @@ from btclib_functional_tests.node import (
     sync_all,
     wait_until_mempools_agree,
 )
-from tests.integration.script_verify_flag_test import bitcoind_version
+from tests.integration.support.script_verify_flag import bitcoind_version
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
