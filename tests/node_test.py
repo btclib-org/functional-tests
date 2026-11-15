@@ -14,6 +14,8 @@ branch.
 from __future__ import annotations
 
 import errno
+import io
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -21,7 +23,8 @@ from typing import TYPE_CHECKING, ClassVar, Self, override
 from unittest.mock import ANY, MagicMock, patch
 
 import pytest
-from bitcoin_core_rpc import HttpError, RpcError, RPCErrorCode
+from bitcoin_core_rpc import BitcoinCoreRpcClient, HttpError, RpcError, RPCErrorCode
+from btclib.b58 import wif_from_prv_key
 
 from btclib_functional_tests.capability import Capability
 from btclib_functional_tests.node import (
@@ -44,6 +47,10 @@ if TYPE_CHECKING:
     from collections.abc import Set as AbstractSet
     from typing import IO
     from urllib.request import Request
+
+# what the clients of the `traced_transport` tests authenticate with,
+# which their transports never read
+_CREDENTIAL = ("user", "pw")
 
 
 class _FakeRpc:
@@ -284,7 +291,10 @@ def test_traced_transport_prints_the_call_and_forwards_the_answer(
     """`--tracerpc`'s own wrapper prints both halves and changes nothing."""
     from urllib.request import Request  # noqa: PLC0415
 
-    request = Request("http://127.0.0.1:1234", data=b'{"method": "getblockcount"}')
+    request = Request(
+        "http://127.0.0.1:1234",
+        data=b'{"method": "getblockcount", "params": ["p4r4m"]}',
+    )
 
     def _inner_transport(req: Request, timeout: float) -> tuple[int, bytes]:
         assert req is request
@@ -294,10 +304,97 @@ def test_traced_transport_prints_the_call_and_forwards_the_answer(
     traced = traced_transport(_inner_transport)
     status, body = traced(request, 5.0)
     assert (status, body) == (200, b'{"result": 1}')
+    assert capsys.readouterr().out == (
+        "--> http://127.0.0.1:1234 getblockcount\n<-- 200 13 bytes\n"
+    )
+
+
+@pytest.mark.parametrize(
+    "data, methods",
+    [
+        (b'[{"method": "a"}, {"method": "b"}]', "a,b"),
+        (b'{"method": "a\\ud800\\n\\u00e9"}', "a\\ud800\\n\\xe9"),
+        (b'[{"method": 7}, "a", {}]', "?,?,?"),
+        (b"not json", "?"),
+        (b"\xff", "?"),
+        (b"[" * 100_000, "?"),
+        (None, "?"),
+    ],
+)
+def test_traced_transport_names_only_the_methods(
+    data: bytes | None, methods: str, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A batch names each member's method, and a body naming none prints `?`."""
+    from urllib.request import Request  # noqa: PLC0415
+
+    traced = traced_transport(lambda _request, _timeout: (500, b""))
+    traced(Request("http://127.0.0.1:1", data=data), 1.0)
+    assert capsys.readouterr().out == (
+        f"--> http://127.0.0.1:1 {methods}\n<-- 500 0 bytes\n"
+    )
+
+
+def test_traced_transport_sends_a_method_its_output_cannot_encode(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A lone surrogate in the method is escaped, and the call goes out."""
+    sent: list[str] = []
+
+    def _node(request: Request, _timeout: float) -> tuple[int, bytes]:
+        assert isinstance(request.data, bytes)
+        call = json.loads(request.data)
+        sent.append(call["method"])
+        reply = {"jsonrpc": "2.0", "id": call["id"], "result": None}
+        return 200, json.dumps(reply).encode()
+
+    output = io.BytesIO()
+    monkeypatch.setattr(sys, "stdout", io.TextIOWrapper(output, encoding="utf-8"))
+    user, password = _CREDENTIAL
+    client = BitcoinCoreRpcClient(
+        "http://127.0.0.1:1",
+        user=user,
+        password=password,
+        transport=traced_transport(_node),
+    )
+    assert client.call("a\ud800", []) is None
+    sys.stdout.flush()
+    assert sent == ["a\ud800"]
+    assert b" a\\ud800\n<-- 200 " in output.getvalue()
+
+
+def test_traced_transport_prints_no_part_of_a_key(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """An `importdescriptors` call carrying a WIF, and a reply quoting it.
+
+    Neither the request nor the reply prints any eight characters of the
+    WIF in a row.
+    """
+    wif = wif_from_prv_key(7, "regtest")
+    descriptor = f"wpkh({wif})"
+
+    def _node(request: Request, _timeout: float) -> tuple[int, bytes]:
+        assert isinstance(request.data, bytes)
+        sent = json.loads(request.data)
+        assert descriptor in str(sent["params"])
+        error = {"code": -5, "message": f"cannot import {descriptor}"}
+        result = [{"success": False, "error": error}]
+        reply = {"jsonrpc": "2.0", "id": sent["id"], "result": result}
+        return 200, json.dumps(reply).encode()
+
+    user, password = _CREDENTIAL
+    client = BitcoinCoreRpcClient(
+        "http://127.0.0.1:1",
+        user=user,
+        password=password,
+        transport=traced_transport(_node),
+    )
+    answer = client.call("importdescriptors", [[{"desc": descriptor, "timestamp": 0}]])
+    assert descriptor in str(answer)
     printed = capsys.readouterr().out
-    assert "getblockcount" in printed
-    assert "200" in printed
-    assert "result" in printed
+    assert "importdescriptors" in printed
+    windows = {wif[i : i + 8] for i in range(len(wif) - 7)}
+    assert not [window for window in windows if window in printed]
 
 
 def test_start_waits_for_the_rpc_and_creates_the_datadir(tmp_path: Path) -> None:

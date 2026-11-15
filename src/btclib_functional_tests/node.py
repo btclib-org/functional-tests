@@ -19,6 +19,7 @@ one answers.
 
 from __future__ import annotations
 
+import json
 import os
 import secrets
 import socket
@@ -197,24 +198,53 @@ def _process_cursor() -> _PortCursor:
     return _PortCursor(_worker_block(os.environ))
 
 
+def _traced_methods(data: object) -> str:
+    """Return the json-rpc method a request body names, `?` for none.
+
+    A batch names one per member, comma-separated. Nothing else of the
+    body is printed, so no parameter reaches the trace. A method is
+    escaped to ASCII, so that printing it cannot raise where the output
+    cannot encode it, as for a lone surrogate.
+
+    :param data: the body of the request, as `Request.data` holds it.
+    """
+    if not isinstance(data, bytes):
+        return "?"
+    try:
+        parsed = json.loads(data)
+    except (ValueError, RecursionError):
+        return "?"
+    members = parsed if isinstance(parsed, list) else [parsed]
+    return ",".join(
+        member["method"].encode("unicode_escape").decode("ascii")
+        if isinstance(member, dict) and isinstance(member.get("method"), str)
+        else "?"
+        for member in members
+    )
+
+
 def traced_transport(transport: HttpTransport) -> HttpTransport:
     """Wrap `transport`, printing every RPC exchange it carries.
 
     Core's own `--tracerpc` (`test_framework.py`): "Print out all RPC
-    calls as they are made". `bitcoin_core_rpc.BitcoinCoreRpcClient`'s
-    own `transport=` is exactly the two-argument callable
-    (`bitcoin_core_rpc.transport.HttpTransport`) this wraps, an
-    already-built `Request` and a timeout answered with a status and a
-    body, so tracing needs no change to the client itself.
+    calls as they are made". This wrapper prints the URL and the method of
+    each call, and the status and the length of its reply. It prints
+    neither the parameters nor the result, since either can carry a key:
+    section 7 of the organization's standard, *Reprs and logs*.
+
+    `bitcoin_core_rpc.BitcoinCoreRpcClient`'s own `transport=` is exactly
+    the two-argument callable (`bitcoin_core_rpc.transport.HttpTransport`)
+    this wraps, an already-built `Request` and a timeout answered with a
+    status and a body, so tracing needs no change to the client itself.
 
     :param transport: the transport to wrap, an adapter's own
         `_ThreadSessions` where `NodeAdapter._rpc_transport` is what asks.
     """
 
     def _traced(request: Request, timeout: float) -> tuple[int, bytes]:
-        print(f"--> {request.full_url} {request.data!r}")  # noqa: T201
+        print(f"--> {request.full_url} {_traced_methods(request.data)}")  # noqa: T201
         status, body = transport(request, timeout)
-        print(f"<-- {status} {body!r}")  # noqa: T201
+        print(f"<-- {status} {len(body)} bytes")  # noqa: T201
         return status, body
 
     return _traced
