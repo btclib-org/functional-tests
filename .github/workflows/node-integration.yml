@@ -96,7 +96,10 @@ permissions:
   contents: read
 
 concurrency:
-  group: node-integration-${{ github.event.pull_request.number || github.ref }}
+  group: >-
+    node-integration-${{ github.event_name == 'push'
+    && format('{0}-{1}', github.sha, github.ref)
+    || github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 # the pinned bitcoind for every job that installs its own: the
