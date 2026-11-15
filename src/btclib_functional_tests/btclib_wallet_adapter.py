@@ -195,23 +195,23 @@ class NodeBackend:
         so a confirmed coin's transaction is asked for in the block its
         confirmations name.
 
-        `getrawtransaction` by the id alone also finds a transaction in a
-        block under `-txindex`, hence `getmempoolentry` first. A
-        transaction mined between the two calls is the chain's.
+        `getrawtransaction` by the id alone reads the mempool, then
+        `-txindex`. An answer from a block names its `blockhash`, and its
+        coin is read from the chain, where a block may have spent it.
         """
         rpc = self._node.rpc
         txid = tx_id_hex(outpoint.tx_id)
         network = network_of(self._node)
         try:
-            rpc.call("getmempoolentry", [txid])
-            raw = rpc.call("getrawtransaction", [txid, False])
+            found = rpc.call("getrawtransaction", [txid, True])
         except RpcError as exc:
-            # -5: not in the mempool, or mined since without `-txindex`
+            # -5: in neither the mempool nor `-txindex`
             if exc.code != RPCErrorCode.INVALID_ADDRESS_OR_KEY:
                 raise
         else:
-            parent = tx_from_raw(bytes.fromhex(raw), txid, network)
-            return parent if outpoint.vout < len(parent.vout) else None
+            if "blockhash" not in found:
+                parent = tx_from_raw(bytes.fromhex(found["hex"]), txid, network)
+                return parent if outpoint.vout < len(parent.vout) else None
         coin = rpc.call("gettxout", [txid, outpoint.vout, False])
         if coin is None:
             return None
@@ -601,7 +601,8 @@ class BtclibWalletFactory:
     def node_capabilities(self) -> AbstractSet[Capability]:
         """None: the wallet reads the chain over RPC calls no capability names.
 
-        The calls `BitcoinCoreFetcher` makes.
+        The calls `BitcoinCoreFetcher` and `NodeBackend.get_coin_parent`
+        make.
         """
         return frozenset()
 

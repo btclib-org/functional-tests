@@ -945,22 +945,21 @@ def test_node_backend_asks_a_new_fetcher_each_call(
 class _CoinNode:
     """A node answering `NodeBackend.get_coin_parent`, keeping each call.
 
-    `in_mempool` is what `getmempoolentry` answers: an entry, or the
-    `RpcError` it raises. A list answers its items, one call each.
+    `by_id` is what `getrawtransaction` answers without a block: a
+    verbose answer, or the `RpcError` it raises. With a block it answers
+    `in_block`, `parent`'s hex unless a test sets another.
     """
 
     chain = "regtest"
 
-    def __init__(
-        self, parent: Tx, coin: object = None, in_mempool: object = None
-    ) -> None:
+    def __init__(self, parent: Tx, coin: object = None, by_id: object = None) -> None:
         self.answers: dict[str, object] = {
-            "getmempoolentry": in_mempool or RpcError("not in mempool", -5),
             "gettxout": coin,
             "getblockheader": {"height": 7},
             "getblockhash": "bb" * 32,
-            "getrawtransaction": parent.serialize(include_witness=True).hex(),
         }
+        self.by_id = by_id or RpcError("No such mempool transaction", -5)
+        self.in_block = _hex(parent)
         self.calls: list[tuple[str, list[object]]] = []
 
     @property
@@ -969,17 +968,26 @@ class _CoinNode:
 
     def call(self, method: str, params: list[object]) -> object:
         self.calls.append((method, params))
-        answer = self.answers[method]
-        if isinstance(answer, list):
-            answer = answer.pop(0)
-        if isinstance(answer, RpcError):
-            raise answer
-        return answer
+        if method != "getrawtransaction":
+            return self.answers[method]
+        if len(params) == 3:
+            return self.in_block
+        if isinstance(self.by_id, RpcError):
+            raise self.by_id
+        return self.by_id
+
+
+def _hex(tx: Tx) -> str:
+    """Return `tx`'s serialization, witness included, as hex."""
+    return tx.serialize(include_witness=True).hex()
 
 
 def _coin_parent(node: _CoinNode, outpoint: OutPoint) -> Tx | None:
     """Return `NodeBackend.get_coin_parent`'s answer over `node`."""
     return NodeBackend(cast("NodeAdapter", node)).get_coin_parent(outpoint)
+
+
+_COIN = {"confirmations": 2, "bestblock": "aa" * 32}
 
 
 def test_node_backend_reads_a_chain_coin_s_transaction_in_its_block() -> None:
@@ -989,13 +997,13 @@ def test_node_backend_reads_a_chain_coin_s_transaction_in_its_block() -> None:
     """
     parent = _payment(_ADDRESS)
     txid = parent.id.hex()
-    node = _CoinNode(parent, {"confirmations": 2, "bestblock": "aa" * 32})
+    node = _CoinNode(parent, _COIN)
     found = _coin_parent(node, OutPoint(parent.id, 0))
     assert found is not None
     assert found.id == parent.id
     assert found.vout[0].script_pub_key.network == "regtest"
     assert node.calls == [
-        ("getmempoolentry", [txid]),
+        ("getrawtransaction", [txid, True]),
         ("gettxout", [txid, 0, False]),
         ("getblockheader", ["aa" * 32]),
         ("getblockhash", [6]),
@@ -1006,21 +1014,57 @@ def test_node_backend_reads_a_chain_coin_s_transaction_in_its_block() -> None:
 def test_node_backend_reads_a_mempool_transaction_by_its_id() -> None:
     """Each of its outputs is a coin, spent in the mempool or not."""
     parent = _payment(_ADDRESS)
-    txid = parent.id.hex()
-    node = _CoinNode(parent, in_mempool={"vsize": 110})
+    node = _CoinNode(parent, by_id={"hex": _hex(parent)})
     found = _coin_parent(node, OutPoint(parent.id, 0))
     assert found is not None
     assert found.id == parent.id
-    assert node.calls == [
-        ("getmempoolentry", [txid]),
-        ("getrawtransaction", [txid, False]),
+    assert node.calls == [("getrawtransaction", [parent.id.hex(), True])]
+
+
+@pytest.mark.parametrize("coin", [None, _COIN], ids=["spent", "unspent"])
+def test_node_backend_reads_the_chain_for_a_transaction_txindex_finds(
+    coin: dict[str, object] | None,
+) -> None:
+    """An answer naming its block is checked in the chain, which decides.
+
+    `getrawtransaction` reads `-txindex` once the mempool lacks the
+    transaction: mined, perhaps in the block of a child spending this
+    output.
+    """
+    parent = _payment(_ADDRESS)
+    txid = parent.id.hex()
+    by_id = {"hex": _hex(parent), "blockhash": "cc" * 32}
+    node = _CoinNode(parent, coin, by_id)
+    found = _coin_parent(node, OutPoint(parent.id, 0))
+    assert (found is None) == (coin is None)
+    assert node.calls[:2] == [
+        ("getrawtransaction", [txid, True]),
+        ("gettxout", [txid, 0, False]),
     ]
+
+
+def test_node_backend_refuses_another_transaction_by_its_id() -> None:
+    """The mempool's answer is the transaction asked for, or refused."""
+    parent = _payment(_ADDRESS)
+    other = _payment(_ADDRESS, _VALUE + 1)
+    node = _CoinNode(parent, by_id={"hex": _hex(other)})
+    with pytest.raises(FetchError, match="not the one asked"):
+        _coin_parent(node, OutPoint(parent.id, 0))
+
+
+def test_node_backend_refuses_another_transaction_in_the_block() -> None:
+    """The block's answer is the transaction asked for, or refused."""
+    parent = _payment(_ADDRESS)
+    node = _CoinNode(parent, _COIN)
+    node.in_block = _hex(_payment(_ADDRESS, _VALUE + 1))
+    with pytest.raises(FetchError, match="not the one asked"):
+        _coin_parent(node, OutPoint(parent.id, 0))
 
 
 def test_node_backend_answers_none_for_an_output_a_mempool_tx_lacks() -> None:
     """`CCoinsViewMemPool::GetCoin` answers no coin past the last output."""
     parent = _payment(_ADDRESS)
-    node = _CoinNode(parent, in_mempool={"vsize": 110})
+    node = _CoinNode(parent, by_id={"hex": _hex(parent)})
     assert _coin_parent(node, OutPoint(parent.id, 1)) is None
 
 
@@ -1030,34 +1074,15 @@ def test_node_backend_answers_none_for_a_coin_the_node_does_not_hold() -> None:
     node = _CoinNode(parent)
     assert _coin_parent(node, OutPoint(parent.id, 0)) is None
     txid = parent.id.hex()
-    assert node.calls == [("getmempoolentry", [txid]), ("gettxout", [txid, 0, False])]
-
-
-def test_node_backend_reads_the_chain_for_a_transaction_mined_meanwhile() -> None:
-    """Mined after `getmempoolentry`, its id finds it nowhere: no `-txindex`."""
-    parent = _payment(_ADDRESS)
-    txid = parent.id.hex()
-    node = _CoinNode(
-        parent, {"confirmations": 1, "bestblock": "aa" * 32}, {"vsize": 110}
-    )
-    raw = node.answers["getrawtransaction"]
-    node.answers["getrawtransaction"] = [RpcError("No such mempool tx", -5), raw]
-    found = _coin_parent(node, OutPoint(parent.id, 0))
-    assert found is not None
-    assert found.id == parent.id
     assert node.calls == [
-        ("getmempoolentry", [txid]),
-        ("getrawtransaction", [txid, False]),
+        ("getrawtransaction", [txid, True]),
         ("gettxout", [txid, 0, False]),
-        ("getblockheader", ["aa" * 32]),
-        ("getblockhash", [7]),
-        ("getrawtransaction", [txid, False, "bb" * 32]),
     ]
 
 
 def test_node_backend_raises_any_other_rpc_error() -> None:
-    """Only `RPC_INVALID_ADDRESS_OR_KEY` says the mempool lacks it."""
+    """Only `RPC_INVALID_ADDRESS_OR_KEY` says the node lacks it."""
     parent = _payment(_ADDRESS)
-    node = _CoinNode(parent, in_mempool=RpcError("warming up", -28))
+    node = _CoinNode(parent, by_id=RpcError("warming up", -28))
     with pytest.raises(RpcError, match="warming up"):
         _coin_parent(node, OutPoint(parent.id, 0))
