@@ -58,6 +58,7 @@ from btclib.script.engine import (
     verify_transaction,
 )
 from btclib.script.script_pub_key import ScriptPubKey
+from btclib.script.witness import Witness
 from btclib.tx import OutPoint, Tx, TxOut
 from btclib_wallet.bip32.bip32 import rootxprv_from_seed
 from btclib_wallet.descriptors.descriptors import add_checksum
@@ -466,15 +467,19 @@ class BtclibWallet:
             parents.append((parent, owned))
             spent.append(parent.vout[tx_in.prev_out.vout])
         psbt = Psbt.from_tx(unsigned)
+        kept: dict[int, tuple[bytes, Witness]] = {}
         for i, (parent, owned) in enumerate(parents):
             psbt_in = psbt.inputs[i]
             if not owned:
                 psbt_in.non_witness_utxo = parent
             if not owned or _verifies(spent, tx, i):
-                psbt_in.final_script_sig = tx.vin[i].script_sig
-                psbt_in.final_script_witness = tx.vin[i].script_witness
+                kept[i] = tx.vin[i].script_sig, tx.vin[i].script_witness
+                psbt_in.final_script_sig, psbt_in.final_script_witness = kept[i]
         try:
-            final = finalize(ledger.sign(psbt))
+            # `finalize` asks the solver for an input whose final scripts
+            # are both empty, as a kept P2A input's are, and refuses it
+            # where none answers
+            final = finalize(ledger.sign(psbt), solver=lambda _, i: kept.get(i))
             signed = extract_tx(final, verify_scripts=False, max_fee_rate=None)
             verify_transaction(spent, signed, _STANDARD_FLAGS, check_amounts=False)
         except BTClibValueError:

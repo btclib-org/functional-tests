@@ -24,7 +24,7 @@ from btclib.fee import FeeRate
 from btclib.key import PrvKeyData
 from btclib.network import NETWORKS
 from btclib.script import ScriptPubKey, serialize
-from btclib.script.engine import verify_input
+from btclib.script.engine import PAY_TO_ANCHOR, verify_input
 from btclib.script.witness import Witness
 from btclib.tx import OutPoint, Tx, TxIn, TxOut
 from btclib_wallet.bip32.bip32 import rootxprv_from_seed
@@ -753,6 +753,32 @@ def test_sign_checks_no_amount(funded: tuple[BtclibWallet, _Chain, Tx]) -> None:
     out = TxOut(2 * _VALUE, ScriptPubKey.from_address(_ADDRESS))
     signed = wallet.sign(Tx(2, 0, [TxIn(OutPoint(payment.id, 0))], [out]))
     verify_input([payment.vout[0]], signed, 0)
+
+
+def test_sign_keeps_a_pay_to_anchor_input_s_empty_scripts(
+    funded: tuple[BtclibWallet, _Chain, Tx],
+) -> None:
+    """A P2A input verifies with no `script_sig` and no witness.
+
+    Core's `SignStep` solves `TxoutType::ANCHOR` with nothing, and its
+    interpreter accepts P2A under the standard flags.
+    """
+    wallet, chain, payment = funded
+    anchor = Tx(
+        2,
+        0,
+        [TxIn(OutPoint(b"\x02" * 32, 0))],
+        [TxOut(240, ScriptPubKey(PAY_TO_ANCHOR, "regtest"))],
+    )
+    chain.mine(anchor)
+    vin = [TxIn(OutPoint(payment.id, 0)), TxIn(OutPoint(anchor.id, 0))]
+    out = TxOut(_VALUE // 2, ScriptPubKey.from_address(_ADDRESS))
+    signed = wallet.sign(Tx(2, 0, vin, [out]))
+    assert not signed.vin[1].script_sig
+    assert not signed.vin[1].script_witness.stack
+    prevouts = [payment.vout[0], anchor.vout[0]]
+    verify_input(prevouts, signed, 0)
+    verify_input(prevouts, signed, 1)
 
 
 def test_an_imported_descriptor_makes_its_payments_the_wallet_s(
