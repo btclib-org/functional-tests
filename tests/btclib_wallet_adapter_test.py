@@ -544,13 +544,13 @@ class _Signed:
     """Alice's coin and bob's in one transaction, bob's input signed by bob.
 
     `where` bob's coin is: in a `block`, in the `mempool`, or in the
-    transaction that pays `alice's`, which her ledger holds. A `nested`
-    coin pays bob's P2SH-P2WPKH script, whose input carries a
-    `script_sig` and a witness.
+    transaction that pays `alice's`, which her ledger holds. `kind` is
+    bob's script: P2WPKH, P2SH-P2WPKH, whose input carries a `script_sig`
+    and a witness, or P2PKH, whose input carries a `script_sig` alone.
     """
 
     def __init__(
-        self, tmp_path: Path, where: str = "block", *, nested: bool = False
+        self, tmp_path: Path, where: str = "block", *, kind: str = "wpkh"
     ) -> None:
         self.chain = _Chain()
         self.factory = BtclibWalletFactory(tmp_path, lambda _: self.chain)
@@ -558,9 +558,10 @@ class _Signed:
         self.alice = self.factory.create(node, "alice")
         bob = self.factory.create(node, "bob")
         bob_address = bob.new_address()
-        if nested:
+        if kind != "wpkh":
             xprv = rootxprv_from_seed(bytes(32), NETWORKS["regtest"].bip32_prv)
-            bob.import_descriptor(add_checksum(f"sh(wpkh({xprv}/0/*))"))
+            descriptor = "sh(wpkh(K))" if kind == "sh-wpkh" else "pkh(K)"
+            bob.import_descriptor(add_checksum(descriptor.replace("K", f"{xprv}/0/*")))
             bob_address = bob.ledger.new_address(1)
         alice_coin = _payment(self.alice.new_address())
         bob_coin = _payment(bob_address)
@@ -584,8 +585,11 @@ class _Signed:
         bob_in = bob.ledger.sign(psbt).inputs[1]
         ((pub_key, sig),) = bob_in.partial_sigs.items()
         self.sig, self.pub_key = sig, pub_key
-        self.tx.vin[1].script_witness = Witness([sig, pub_key])
-        if nested:
+        if kind == "pkh":
+            self.tx.vin[1].script_sig = serialize([sig, pub_key])
+        else:
+            self.tx.vin[1].script_witness = Witness([sig, pub_key])
+        if kind == "sh-wpkh":
             self.tx.vin[1].script_sig = serialize([bob_in.redeem_script])
         verify_input(self.prevouts, self.tx, 1)
 
@@ -628,8 +632,15 @@ def test_sign_keeps_a_signature_on_a_coin_spent_in_the_mempool(
 
 def test_sign_keeps_a_nested_segwit_input_s_script_sig(tmp_path: Path) -> None:
     """Bob's P2SH-P2WPKH input keeps its `script_sig` beside its witness."""
-    given = _Signed(tmp_path, nested=True)
+    given = _Signed(tmp_path, kind="sh-wpkh")
     assert given.tx.vin[1].script_sig
+    _assert_kept(given)
+
+
+def test_sign_keeps_a_legacy_input_s_script_sig(tmp_path: Path) -> None:
+    """Bob's P2PKH input keeps its `script_sig`, and has no witness."""
+    given = _Signed(tmp_path, kind="pkh")
+    assert not given.tx.vin[1].script_witness.stack
     _assert_kept(given)
 
 
@@ -973,7 +984,8 @@ class _CoinNode:
 
     `by_id` is what `getrawtransaction` answers without a block: a
     verbose answer, or the `RpcError` it raises. With a block it answers
-    `in_block`, `parent`'s hex unless a test sets another.
+    `in_block`, `parent`'s hex unless a test sets another hex or an
+    `RpcError`.
     """
 
     chain = "regtest"
@@ -983,9 +995,10 @@ class _CoinNode:
             "gettxout": coin,
             "getblockheader": {"height": 7},
             "getblockhash": "bb" * 32,
+            "getbestblockhash": "aa" * 32,
         }
         self.by_id = by_id or RpcError("No such mempool transaction", -5)
-        self.in_block = _hex(parent)
+        self.in_block: object = _hex(parent)
         self.calls: list[tuple[str, list[object]]] = []
 
     @property
@@ -997,6 +1010,8 @@ class _CoinNode:
         if method != "getrawtransaction":
             return self.answers[method]
         if len(params) == 3:
+            if isinstance(self.in_block, RpcError):
+                raise self.in_block
             return self.in_block
         if isinstance(self.by_id, RpcError):
             raise self.by_id
@@ -1033,6 +1048,7 @@ def test_node_backend_reads_a_chain_coin_s_transaction_in_its_block() -> None:
         ("gettxout", [txid, 0, False]),
         ("getblockheader", ["aa" * 32]),
         ("getblockhash", [6]),
+        ("getbestblockhash", []),
         ("getrawtransaction", [txid, False, "bb" * 32]),
     ]
 
@@ -1084,6 +1100,34 @@ def test_node_backend_refuses_another_transaction_in_the_block() -> None:
     node = _CoinNode(parent, _COIN)
     node.in_block = _hex(_payment(_ADDRESS, _VALUE + 1))
     with pytest.raises(FetchError, match="not the one asked"):
+        _coin_parent(node, OutPoint(parent.id, 0))
+
+
+def test_node_backend_refuses_a_block_found_while_the_tip_moved() -> None:
+    """The height `gettxout`'s tip names may be another chain's block."""
+    parent = _payment(_ADDRESS)
+    node = _CoinNode(parent, _COIN)
+    node.answers["getbestblockhash"] = "dd" * 32
+    with pytest.raises(FetchError, match="the tip moved"):
+        _coin_parent(node, OutPoint(parent.id, 0))
+    assert node.calls[-1] == ("getbestblockhash", [])
+
+
+def test_node_backend_refuses_a_coin_whose_block_is_pruned() -> None:
+    """`gettxout` holds the coin, and the node no longer the block."""
+    parent = _payment(_ADDRESS)
+    node = _CoinNode(parent, _COIN)
+    node.in_block = RpcError("Block not available", -1)
+    with pytest.raises(FetchError, match="pruned"):
+        _coin_parent(node, OutPoint(parent.id, 0))
+
+
+def test_node_backend_raises_any_other_error_reading_the_block() -> None:
+    """Only `RPC_MISC_ERROR` says the block is not available."""
+    parent = _payment(_ADDRESS)
+    node = _CoinNode(parent, _COIN)
+    node.in_block = RpcError("No such transaction found in the provided block", -5)
+    with pytest.raises(RpcError, match="provided block"):
         _coin_parent(node, OutPoint(parent.id, 0))
 
 

@@ -35,7 +35,10 @@ What differs from bitcoind's wallet here is the ledger's:
   resubmits its own on load (`Ledger.resubmit`'s docstring);
 - a descriptor imported with a WIF is watch-only: btclib-wallet's
   descriptor parser keeps the private key of an extended key, and of no
-  other (`descriptors.parse`).
+  other (`descriptors.parse`);
+- `sign` refuses an input whose coin is in a block the node pruned:
+  btclib-wallet's signer asks every input's previous transaction (its
+  psbt's `non_witness_utxo`), where Core's wallet reads the coin alone.
 """
 
 from __future__ import annotations
@@ -152,6 +155,9 @@ class ChainBackend(Protocol):
         outputs, spent in the mempool or not. Otherwise the output is read
         from the node's chain, where it is unspent. `None` where neither
         holds it.
+
+        :raises btclib_wallet.exceptions.FetchError: the node holds the
+            coin and cannot give the transaction paying it.
         """
         ...
 
@@ -191,15 +197,15 @@ class NodeBackend:
         """Ask the mempool for the transaction, then the chain for the coin.
 
         The order of Core's `CCoinsViewMemPool::GetCoin`, which `findCoins`
-        reads through. `gettxout` leaves the mempool out, so a spend there
-        does not hide the chain's coin. `getrawtransaction` finds a
-        transaction in a block only with `-txindex` or the block's hash,
-        so a confirmed coin's transaction is asked for in the block its
-        confirmations name.
+        reads through. An answer by the id alone that names its
+        `blockhash` came from `-txindex`, and its coin is read from the
+        chain, where a block may have spent it. `gettxout` reads the
+        chain's coin with the mempool left out, so a spend there does not
+        hide it. Its transaction is then read in the block its
+        confirmations name, on the tip `gettxout` read.
 
-        `getrawtransaction` by the id alone reads the mempool, then
-        `-txindex`. An answer from a block names its `blockhash`, and its
-        coin is read from the chain, where a block may have spent it.
+        :raises btclib_wallet.exceptions.FetchError: the tip moved
+            meanwhile, or the node pruned that block.
         """
         rpc = self._node.rpc
         txid = tx_id_hex(outpoint.tx_id)
@@ -219,7 +225,18 @@ class NodeBackend:
             return None
         tip = rpc.call("getblockheader", [coin["bestblock"]])["height"]
         block = rpc.call("getblockhash", [tip - coin["confirmations"] + 1])
-        raw = rpc.call("getrawtransaction", [txid, False, block])
+        if rpc.call("getbestblockhash", []) != coin["bestblock"]:
+            # the height may name a block of another chain
+            err_msg = "transaction: the tip moved while its block was found"
+            raise FetchError(err_msg)
+        try:
+            raw = rpc.call("getrawtransaction", [txid, False, block])
+        except RpcError as exc:
+            # -1: "Block not available"
+            if exc.code != RPCErrorCode.MISC_ERROR:
+                raise
+            err_msg = "transaction: its block is pruned"
+            raise FetchError(err_msg) from exc
         return tx_from_raw(bytes.fromhex(raw), txid, network)
 
 
@@ -454,6 +471,9 @@ class BtclibWallet:
 
         :raises ValueError: an input is left unsigned, or keeps a signature
             that does not verify.
+        :raises btclib_wallet.exceptions.FetchError: from
+            `ChainBackend.get_coin_parent`: the node holds an input's coin
+            and cannot give its transaction.
         """
         # `Psbt.from_tx` empties the inputs of the transaction it is given
         unsigned = Tx.parse(tx.serialize(include_witness=False, check_validity=False))
@@ -481,9 +501,9 @@ class BtclibWallet:
                 if not owned or _verifies(spent, tx, i, precomputed):
                     kept[i] = tx.vin[i].script_sig, tx.vin[i].script_witness
                     psbt_in.final_script_sig, psbt_in.final_script_witness = kept[i]
-            # `finalize` asks the solver for an input whose final scripts
-            # are both empty, as a kept P2A input's are, and refuses it
-            # where none answers
+            # `finalize` asks the solver for each input with no final
+            # scripts, a kept P2A input among them; where it answers None,
+            # `finalize` builds the input from its signatures or refuses it
             final = finalize(ledger.sign(psbt), solver=lambda _, i: kept.get(i))
             signed = extract_tx(final, verify_scripts=False, max_fee_rate=None)
             verify_transaction(spent, signed, _STANDARD_FLAGS, check_amounts=False)
