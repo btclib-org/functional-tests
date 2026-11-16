@@ -17,10 +17,10 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from tests.integration.bitcoind_adapters_test import UnboundBitcoindAdapter
 from tests.integration.feature_port_test import (
     port_and_bind_decide_where_the_node_listens,
 )
+from tests.integration.support.bitcoind_adapters import UnboundBitcoindAdapter
 
 if TYPE_CHECKING:
     from pathlib import Path

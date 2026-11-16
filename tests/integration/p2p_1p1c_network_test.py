@@ -61,7 +61,7 @@ version with the new rule, so the body fails against such a build.
 What differs from Core's file:
 
 - Core's second wallet is a `MiniWalletMode.RAW_P2PK` one on the third
-  node: here `mine_p2pk_coins` (`p2pk_coins_test.py`) mines, on that
+  node: here `mine_p2pk_coins` (`support/p2pk_coins/`) mines, on that
   node, coinbases paying `RAW_P2PK_SCRIPT_PUB_KEY`, and
   `raw_p2pk_script_sig` (`mini_wallet.py`) signs every spend of one,
   every input signed under btclib's deterministic nonce where Core's
@@ -103,12 +103,12 @@ from btclib_functional_tests.node import (
     wait_until_mempools_agree,
 )
 from btclib_functional_tests.peer import Peer
-from tests.integration.p2pk_coins_test import (
+from tests.integration.support.p2pk_coins import (
     mine_p2pk_coins,
     p2pk_new_utxo,
     p2pk_self_transfer,
 )
-from tests.integration.script_verify_flag_test import bitcoind_version
+from tests.integration.support.script_verify_flag import bitcoind_version
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence

@@ -18,7 +18,7 @@ Core keeps its framework's own `-bind` entries off the node:
 `TestNode.start` adds wherever no `-bind` is given
 (`test_framework/test_node.py`). An adapter's own `_command` may name
 one too, so the node is built from the class the caller passes,
-`UnboundBitcoindAdapter` (`bitcoind_adapters_test.py`) for bitcoind. Every
+`UnboundBitcoindAdapter` (`support/bitcoind_adapters/`) for bitcoind. Every
 start names a `-port`, so the node never listens at its chain's default
 port.
 

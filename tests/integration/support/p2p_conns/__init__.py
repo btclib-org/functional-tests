@@ -11,9 +11,6 @@ is Core's `PeerTxRelayer`, which also asks for whatever the node
 announces and records what the node asks of it. A test file's own peer
 subclasses `Conn` and extends `_handle`. `Conn.inbound` and
 `Conn.outbound` connect one, and `Clock` is Core's mock time.
-
-This module holds no test: its name ends `_test` for the repository's
-`name-tests-test` hook.
 """
 
 from __future__ import annotations

@@ -63,7 +63,7 @@ from btclib_functional_tests.mini_wallet import (
     build_next_block,
     raw_p2pk_script_sig,
 )
-from tests.integration.script_verify_flag_test import block_script_verify_flag_failed
+from tests.integration.support.script_verify_flag import block_script_verify_flag_failed
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence

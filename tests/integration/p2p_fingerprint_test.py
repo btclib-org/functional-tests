@@ -72,7 +72,7 @@ from btclib.p2p import (
 
 from btclib_functional_tests.capability import Capability, require
 from btclib_functional_tests.timeout_factor import scaled
-from tests.integration.p2p_conns_test import Conn
+from tests.integration.support.p2p_conns import Conn
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence

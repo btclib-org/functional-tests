@@ -7,9 +7,6 @@
 A block, or a transaction in one, that fails script verification is
 refused with `block-script-verify-flag-failed` from `v30.0` and with
 `mandatory-script-verify-flag-failed` before it (bitcoin/bitcoin#33183).
-
-This module holds no test: its name ends `_test` for the repository's
-`name-tests-test` hook.
 """
 
 from __future__ import annotations
