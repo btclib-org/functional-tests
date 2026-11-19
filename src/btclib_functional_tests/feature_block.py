@@ -4,12 +4,13 @@
 
 """Core's `feature_block` block sequence, built with btclib as data.
 
-Read from Core's `test/functional/feature_block.py` (`f82043af507a`,
-2026-06-30). `steps` returns the sequence as a list of `Step`: each block
-with the verdict expected of it, and between the blocks the other things
-Core's run does to the node or asks of it. Nothing here reaches a node,
-so a runner can feed the list to a node over p2p, as
-`tests/integration/feature_block_test.py` does, or to a chain in process.
+Read from Core's `test/functional/feature_block.py`, at the pin of its
+row in `TF2.md`'s per-test ledger. `steps` returns the sequence as a list
+of `Step`: each block with the verdict expected of it, and between the
+blocks the other things Core's run does to the node or asks of it.
+Nothing here reaches a node, so a runner can feed the list to a node over
+p2p, as `tests/integration/feature_block_test.py` does, or to a chain in
+process.
 
 A runner starts its node on regtest, with BIP34 enforced from
 `BIP34_HEIGHT`: Core's own `-testactivationheight=bip34@2`. The first
@@ -27,10 +28,13 @@ same blocks for the same `start_time`.
 
 What differs from Core's file:
 
-- the invalid-transaction templates of `test/functional/data/invalid_txs.py`
-  are not in the sequence, and neither is the re-org of
-  `LARGE_REORG_SIZE` blocks, which Core's own `--skipreorg` leaves out
+- the re-org of `LARGE_REORG_SIZE` blocks, which Core's own
+  `--skipreorg` leaves out, is not in the sequence
   ([ISS 439](https://github.com/btclib-org/functional-tests/issues/439));
+- Core's `DuplicateInput` template holds one input object twice, so
+  Core's signature lands in both inputs. Here it is in input 0 alone: the
+  node refuses the transaction for its duplicate input before it reads a
+  script;
 - Core mines a block spending the output of the largest valid script
   with `generateblock`, and asks `generateblock` for one spending the
   output of the smallest invalid one. Here both are blocks built like
@@ -46,7 +50,11 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import cast
 
-from btclib.block.block import Block, merkle_root_and_mutated_from_transactions
+from btclib.block.block import (
+    Block,
+    merkle_root_and_mutated_from_transactions,
+    witness_commitment_output,
+)
 from btclib.block.block_header import BlockHeader
 from btclib.block.genesis import genesis_block
 from btclib.block.limits import (
@@ -69,10 +77,13 @@ from btclib.script.script import BYTE_FROM_OP_CODE_NAME
 from btclib.script.script import serialize as script_serialize
 from btclib.script.script_pub_key import ScriptPubKey
 from btclib.script.sig_ops import sig_op_count
+from btclib.script.witness import Witness
 from btclib.tx import OutPoint, Tx, TxIn, TxOut
 from btclib.tx.limits import SEQUENCE_FINAL
 from ecc.dsa import sign_
 from ecc.rfc6979_nonce import rfc6979_nonce_
+
+from btclib_functional_tests.invalid_txs import TEMPLATES
 
 __all__ = [
     "BIP34_HEIGHT",
@@ -235,6 +246,16 @@ _DUPLICATE_COINBASE_HEIGHT = 120
 # pushes, in weight
 _PADDING_OVERHEAD = 276
 
+# Core's own `add_witness_commitment` default: the coinbase's witness
+# stack holds it, and the commitment hashes it
+_WITNESS_NONCE = b"\x00" * 32
+
+# the mempool's and the block's reason for a script that fails: Core's
+# templates give the first, and Core's own loop over them turns it into
+# the second
+_MEMPOOL_SCRIPT_FAILED = "mempool-script-verify-flag-failed"
+_BLOCK_SCRIPT_FAILED = "block-script-verify-flag-failed"
+
 # Core's own `NUM_BUFFER_BLOCKS_TO_GENERATE` and `NUM_OUTPUTS_TO_COLLECT`
 _BUFFER_BLOCKS = 99
 _OUTPUTS_TO_COLLECT = 33
@@ -376,10 +397,16 @@ def _create_tx(spend: Tx, n: int, value: int, script: bytes = _DROPS) -> Tx:
 
 
 def _with_script_sig(tx: Tx, vin_i: int, script_sig: bytes) -> Tx:
-    """Return `tx` with one input's scriptSig replaced."""
+    """Return `tx` with one input's scriptSig replaced, its witness kept."""
     vin = list(tx.vin)
     old = vin[vin_i]
-    vin[vin_i] = TxIn(old.prev_out, script_sig, old.sequence, check_validity=False)
+    vin[vin_i] = TxIn(
+        old.prev_out,
+        script_sig,
+        old.sequence,
+        old.script_witness,
+        check_validity=False,
+    )
     return Tx(tx.version, tx.lock_time, vin, tx.vout, check_validity=False)
 
 
@@ -388,6 +415,24 @@ def _with_outputs(tx: Tx, *outputs: TxOut) -> Tx:
     return Tx(
         tx.version, tx.lock_time, tx.vin, [*tx.vout, *outputs], check_validity=False
     )
+
+
+def _with_witness_commitment(transactions: list[Tx]) -> list[Tx]:
+    """Core's own `add_witness_commitment`, on a block's transactions."""
+    coinbase = transactions[0]
+    tx_in = coinbase.vin[0]
+    vin = [
+        TxIn(
+            tx_in.prev_out,
+            tx_in.script_sig,
+            tx_in.sequence,
+            Witness([_WITNESS_NONCE]),
+            check_validity=False,
+        )
+    ]
+    vout = [*coinbase.vout, witness_commitment_output(transactions, _WITNESS_NONCE)]
+    coinbase = Tx(coinbase.version, coinbase.lock_time, vin, vout, check_validity=False)
+    return [coinbase, *transactions[1:]]
 
 
 def _legacy_sig_op_count(block: Block) -> int:
@@ -462,13 +507,14 @@ class _Chain:
     def sign_tx(self, tx: Tx, spend: Tx) -> Tx:
         """Core's own `sign_tx`: sign input 0, spending output 0 of `spend`.
 
-        An `OP_TRUE` output needs no signature, and its scriptSig is left
-        empty.
+        The signature goes in front of what input 0's scriptSig holds. An
+        `OP_TRUE` output needs no signature, and its scriptSig is emptied.
         """
         script = spend.vout[0].script_pub_key.script
         if script[:1] == _OP_TRUE:
             return _with_script_sig(tx, 0, b"")
-        return _with_script_sig(tx, 0, self.signature_push(tx, 0, script))
+        script_sig = self.signature_push(tx, 0, script) + tx.vin[0].script_sig
+        return _with_script_sig(tx, 0, script_sig)
 
     def create_and_sign(self, spend: Tx, value: int, script: bytes = _OP_TRUE) -> Tx:
         """Core's own `create_and_sign_transaction`, spending output 0."""
@@ -529,9 +575,14 @@ class _Chain:
         *,
         time: int | None = None,
     ) -> Block:
-        """Core's own `update_block`, given the whole transaction list."""
+        """Core's own `update_block`, given the whole transaction list.
+
+        A block holding a witness commits to it, as Core's does.
+        """
         old = self.blocks[name]
         height = self.heights.pop(old.header.hash)
+        if any(tx.is_segwit for tx in transactions):
+            transactions = _with_witness_commitment(transactions)
         block = _make_block(
             old.header.previous_block_hash,
             transactions,
@@ -616,8 +667,35 @@ class _Chain:
         )
 
 
+def _invalid_txs(chain: _Chain, attempt_spend_tx: Tx) -> None:
+    """Core's templates loop: on `b2`, a block of each invalid transaction.
+
+    Each template a block may not hold builds its transaction from
+    `attempt_spend_tx`, signed where it has an input, and the node refuses
+    the block holding it and drops the peer.
+    """
+    for template in TEMPLATES:
+        if template.valid_in_block:
+            continue
+        reason = template.block_reject_reason or template.reject_reason or ""
+        _check(reason != "", f"{template.name} names no reason")
+        if reason.startswith(_MEMPOOL_SCRIPT_FAILED):
+            reason = _BLOCK_SCRIPT_FAILED + reason.removeprefix(_MEMPOOL_SCRIPT_FAILED)
+        name = f"for_invalid.{template.name}"
+        chain.next_block(name)
+        bad_tx = template.get_tx(attempt_spend_tx)
+        if bad_tx.vin:
+            bad_tx = chain.sign_tx(bad_tx, attempt_spend_tx)
+        chain.update_block(name, [bad_tx])
+        chain.reject(name, reason)
+        chain.move_tip("b2")
+
+
 def _fork_and_reorg(chain: _Chain, out: list[Tx]) -> None:
-    """Core's run from `b1` to `b14`: forks, re-orgs, the coinbase's value."""
+    """Core's run from `b1` to `b14`: forks, re-orgs, the coinbase's value.
+
+    The templates loop runs on `b2`, where Core runs it.
+    """
     #     genesis -> b1 (0) -> b2 (1)
     chain.next_block("b1", spend=out[0])
     chain.save_spendable_output()
@@ -625,6 +703,7 @@ def _fork_and_reorg(chain: _Chain, out: list[Tx]) -> None:
     chain.save_spendable_output()
     chain.send("b1")
     chain.send("b2")
+    _invalid_txs(chain, out[2])
 
     # a chain of the same length is not a re-org: b2 was seen first
     #                      \-> b3 (1)

@@ -38,7 +38,10 @@ What differs from Core's file, beyond what the sequence leaves out:
   once the node's clock is two hours ahead;
 - Core starts its node with `-prevoutfetchthreads=8` besides, an option
   of Core's block validation that a bitcoind before `v32.0` refuses as an
-  invalid parameter.
+  invalid parameter;
+- the log half looks for a refusal for a failed script in the wording of
+  the build under test, as `tests/integration/support/script_verify_flag`
+  gives it.
 
 Each `feature_block_<node>_test.py` module beside this one runs each
 body, `tests/integration/conftest.py`'s own module docstring having how.
@@ -69,6 +72,7 @@ from btclib_functional_tests.feature_block import (
 )
 from btclib_functional_tests.node import wait_until
 from btclib_functional_tests.peer import Peer
+from tests.integration.support.script_verify_flag import block_script_verify_flag_failed
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
@@ -86,6 +90,9 @@ type _Cluster = Callable[[int], Sequence[NodeAdapter]]
 _MAGIC = magic_from_chain("regtest")
 
 _BIP34 = f"-testactivationheight=bip34@{BIP34_HEIGHT}"
+
+# the wording `steps` gives a block failing script verification
+_BLOCK_SCRIPT_FAILED = "block-script-verify-flag-failed"
 
 # what Core's `write_config` (`test_framework/util.py`) gives every node
 # and the adapters do not: a `peertimeout` under which the moved clock
@@ -107,11 +114,16 @@ def _debug_log(node: NodeAdapter, skip_counts: SkipCounts) -> Path:
 
 
 def _expecting(
-    log_path: Path | None, reject_reason: str | None
+    log_path: Path | None, reject_reason: str | None, script_failed: str
 ) -> AbstractContextManager[None]:
-    """Return `assert_debug_log` over `log_path`, or nothing to assert."""
+    """Return `assert_debug_log` over `log_path`, or nothing to assert.
+
+    :param script_failed: the node's own wording for a failed script.
+    """
     if log_path is None or reject_reason is None:
         return nullcontext()
+    if reject_reason.startswith(_BLOCK_SCRIPT_FAILED):
+        reject_reason = script_failed + reject_reason.removeprefix(_BLOCK_SCRIPT_FAILED)
     return assert_debug_log(log_path, [reject_reason])
 
 
@@ -147,6 +159,7 @@ class _DataStore:
 
     def __init__(self, node: NodeAdapter) -> None:
         self.node = node
+        self.script_failed = block_script_verify_flag_failed(node)
         self.peer = _connect(node)
         self.blocks: dict[bytes, bytes] = {}
 
@@ -176,7 +189,7 @@ class _DataStore:
         """Core's own `send_blocks([block], ...)`: one block and its verdict."""
         block_hash = step.block.header.hash
         self.blocks[block_hash] = _payload(step)
-        with _expecting(log_path, step.reject_reason):
+        with _expecting(log_path, step.reject_reason, self.script_failed):
             if step.unrequested:
                 self.peer.send_raw(self.blocks[block_hash])
             else:

@@ -60,6 +60,13 @@ btclib\_functional\_tests.feature\_block module
    :members:
    :show-inheritance:
 
+btclib\_functional\_tests.invalid\_txs module
+---------------------------------------------
+
+.. automodule:: btclib_functional_tests.invalid_txs
+   :members:
+   :show-inheritance:
+
 btclib\_functional\_tests.mempool\_util module
 ----------------------------------------------
 
