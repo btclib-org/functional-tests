@@ -70,7 +70,8 @@ class FakeGh:
     path absent from it answers with an empty list. `issues` holds the
     numbers of the open issues titled as searched. `longer_titles` maps
     the number of each other issue the search finds to its title, listed
-    first. Every call is recorded in `calls`.
+    first. Every call is recorded in `calls`. Each answer is bytes, as
+    `subprocess.run` gives with no encoding.
     """
 
     def __init__(self) -> None:
@@ -81,7 +82,7 @@ class FakeGh:
 
     def __call__(
         self, argv: list[str], **_kwargs: object
-    ) -> subprocess.CompletedProcess[str]:
+    ) -> subprocess.CompletedProcess[bytes]:
         """Record the call, and answer the path or the issues it asked about."""
         self.calls.append(list(argv))
         if argv[1:3] == ["issue", "list"]:
@@ -92,9 +93,11 @@ class FakeGh:
                 for number, longer in self.longer_titles.items()
             ]
             issues.extend({"number": number, "title": title} for number in self.issues)
-            return subprocess.CompletedProcess(argv, 0, stdout=json.dumps(issues))
+            return subprocess.CompletedProcess(
+                argv, 0, stdout=json.dumps(issues).encode()
+            )
         if argv[1] == "issue":
-            return subprocess.CompletedProcess(argv, 0, stdout="")
+            return subprocess.CompletedProcess(argv, 0, stdout=b"")
         path = next(a.removeprefix("path=") for a in argv if a.startswith("path="))
         found = self.commits.get(path)
         commits = (
@@ -107,7 +110,7 @@ class FakeGh:
             if found
             else []
         )
-        return subprocess.CompletedProcess(argv, 0, stdout=json.dumps(commits))
+        return subprocess.CompletedProcess(argv, 0, stdout=json.dumps(commits).encode())
 
 
 @pytest.fixture
@@ -201,6 +204,29 @@ def test_a_behind_line_is_told_from_its_absence(
     assert checker._entries_at_tip(ledger) == ([], [f"`bignum.py` ({reason})"])
 
 
+@pytest.mark.parametrize(
+    "behind, reason",
+    [
+        ("0", "a pattern, and this copy derives nothing"),
+        ("1", "already documented as behind"),
+    ],
+)
+def test_an_entry_carrying_a_pattern_is_skipped_unasked(
+    checker: ModuleType, fake_gh: FakeGh, tmp_path: Path, behind: str, reason: str
+) -> None:
+    """A derived entry is named as skipped, and no `gh` call asks about it.
+
+    A `behind` other than 0 is the reason named first, as for any entry.
+    """
+    ledger = tmp_path / "TF2.md"
+    ledger.write_text(
+        _LEDGER.replace("behind  0", f"pattern [a-z_]+\nbehind  {behind}"),
+        encoding="utf-8",
+    )
+    assert checker.find_drift(ledger) == ([], [f"`bignum.py` ({reason})"])
+    assert fake_gh.calls == []
+
+
 def test_a_bare_key_reads_as_that_field_absent(checker: ModuleType) -> None:
     """A bare `commit` or `ref` answers as an absent one does."""
     bare_commit = _LEDGER.replace(f"commit  {_PIN}", "commit")
@@ -225,11 +251,13 @@ def _failing_gh(
     calls: list[list[str]] = []
     slept: list[int] = []
 
-    def run(argv: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
+    def run(argv: list[str], **_kwargs: object) -> subprocess.CompletedProcess[bytes]:
         calls.append(argv)
         if len(calls) <= len(stderrs):
-            raise subprocess.CalledProcessError(1, argv, stderr=stderrs[len(calls) - 1])
-        return subprocess.CompletedProcess(argv, 0, stdout="[]")
+            raise subprocess.CalledProcessError(
+                1, argv, stderr=stderrs[len(calls) - 1].encode()
+            )
+        return subprocess.CompletedProcess(argv, 0, stdout=b"[]")
 
     monkeypatch.setattr(checker.subprocess, "run", run)
     monkeypatch.setattr(checker.time, "sleep", slept.append)
@@ -253,12 +281,14 @@ def test_a_failed_gh_call_prints_its_stderr_and_is_not_retried(
     """A 404 and both rate limits are final: gh's words reach stderr.
 
     [ISS 446](https://github.com/btclib-org/functional-tests/issues/446).
+    The error raised carries them as text, as `_gh_bytes` says.
     """
     calls, slept = _failing_gh(checker, monkeypatch, [stderr])
 
-    with pytest.raises(subprocess.CalledProcessError):
+    with pytest.raises(subprocess.CalledProcessError) as raised:
         checker._latest_commit("r", "p")
 
+    assert raised.value.stderr == stderr
     assert stderr.strip() in capsys.readouterr().err
     assert len(calls) == 1
     assert slept == []
