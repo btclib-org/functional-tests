@@ -104,7 +104,7 @@ report every file one directory down as gone. `vendored-vectors.yml`
 runs it weekly, under a title distinct from the per-pin drift issue, so
 a gained file and a stale pin are never the same issue.
 
-No entry carries a `blob`, which is where this file parts from
+No entry carries a `blob`, which is where this file parts from btclib's
 `tests/_data/README.md`: nothing in this tree is a copy of any file
 below but the RIPEMD-160 implementation, whose own entry names where
 that comparison lives instead of making one here.
@@ -1185,7 +1185,7 @@ gh api --method GET repos/bitcoin/bitcoin/commits \
 | `p2p_nobloomfilter_messages.py` (filtered block, log) | same | same | pass, its log line read per-build ([ISS 35](https://github.com/btclib-org/functional-tests/issues/35)) | skip |
 | `interface_http.py` (excessive request size, wire) | [`228877d7836a`](https://github.com/bitcoin/bitcoin/commit/228877d7836a) | 2026-10-10 | pass, the header-lines refusal asserted per-build ([ISS 35](https://github.com/btclib-org/functional-tests/issues/35)) | pass |
 | `interface_http.py` (excessive request size, log) | same | same | pass, its log lines read per-build ([ISS 35](https://github.com/btclib-org/functional-tests/issues/35)) | skip |
-| `feature_block.py` (wire) | [`f82043af507a`](https://github.com/bitcoin/bitcoin/commit/f82043af507a) | 2026-06-30 | pass | skip (peer_timeout) |
+| `feature_block.py` (wire) | [`079437cca7a8`](https://github.com/bitcoin/bitcoin/commit/079437cca7a8) | 2026-11-19 | pass | skip (peer_timeout) |
 | `feature_block.py` (log) | same | same | pass | skip |
 | `feature_prune_stale_fork.py` | [`3f44f9aef7cc`](https://github.com/bitcoin/bitcoin/commit/3f44f9aef7cc) | 2026-05-12 | pass, the restart asked only of a build carrying bitcoin/bitcoin#35168 ([ISS 354](https://github.com/btclib-org/functional-tests/issues/354)) | skip (fastprune) |
 
@@ -1490,9 +1490,11 @@ no entry here is a `bitcoind only` row, or has its reason in the docstring of
 - `interface_http.py`: the excessive request size step alone, a wire row and a
   log row ([ISS 5](https://github.com/btclib-org/functional-tests/issues/5)).
 - `feature_block.py`: a smaller claim: Core's sequence without its
-  invalid-transaction templates and its `LARGE_REORG_SIZE` re-org
+  `LARGE_REORG_SIZE` re-org
   ([ISS 439](https://github.com/btclib-org/functional-tests/issues/439)),
-  as a body per row, wire and log. Skips on `peer_timeout`.
+  as a body per row, wire and log. The templates of
+  `test/functional/data/invalid_txs.py` are read at the same pin. Skips
+  on `peer_timeout`.
 - `feature_prune_stale_fork.py`: Core's claim in full. Skips on `fastprune`:
   `cli.py` registers no `-fastprune`.
 - `rpc_setban.py`: a row per section of Core's file. Skips on `ban` where the

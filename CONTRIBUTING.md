@@ -408,9 +408,9 @@ why.
 The adapter under `src/btclib_functional_tests/` -- `bitcoind`,
 `bitcoind_wallet`, `btcd`, `btclib_node`, `btclib_wallet_adapter`,
 `capability`, `debug_log`,
-`feature_block`, `mempool_util`, `mini_wallet`, `node`, `peer`, `socks5`,
-`timeout_factor`, `wallet` -- is each its own submodule with its own
-`__all__`, and
+`feature_block`, `invalid_txs`, `mempool_util`, `mini_wallet`, `node`,
+`peer`, `socks5`, `timeout_factor`, `wallet` -- is each its own submodule
+with its own `__all__`, and
 `docs/source/btclib_functional_tests.rst` gives each an `automodule` section
 of its own. The package root re-exports none of them and keeps an empty
 `__all__` by decision, a caller importing the submodule it needs instead.

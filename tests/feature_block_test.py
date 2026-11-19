@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import pytest
 from btclib.block.genesis import genesis_block
+from btclib.script.script import BYTE_FROM_OP_CODE_NAME
 
 from btclib_functional_tests.feature_block import (
     BlockStep,
@@ -23,6 +24,7 @@ from btclib_functional_tests.feature_block import (
     _check,
     steps,
 )
+from btclib_functional_tests.invalid_txs import TEMPLATES
 
 _START = 1_800_000_000
 
@@ -119,3 +121,60 @@ def test_b24_pads_with_the_transaction_core_built_for_b23(
     blocks = {step.name: step.block for step in _block_steps(sequence)}
     padding = blocks["b24"].transactions[-1]
     assert padding.vin[0].prev_out.tx_id == blocks["b23"].transactions[1].id
+
+
+def test_each_template_a_block_may_not_hold_is_refused_on_b2(
+    sequence: list[Step],
+) -> None:
+    """Core's templates loop: a block on `b2` for each, its peer dropped."""
+    blocks = _block_steps(sequence)
+    b2 = next(step for step in blocks if step.name == "b2")
+    refused = [step for step in blocks if step.name.startswith("for_invalid.")]
+    assert [step.name for step in refused] == [
+        f"for_invalid.{template.name}"
+        for template in TEMPLATES
+        if not template.valid_in_block
+    ]
+    for step in refused:
+        assert step.block.header.previous_block_hash == b2.block.header.hash
+        assert step.reject_reason
+        assert step.disconnects
+
+
+def test_a_failed_script_is_refused_in_the_block_s_words(
+    sequence: list[Step],
+) -> None:
+    """Core's own loop turns a template's mempool wording into the block's."""
+    reasons = {step.name: step.reject_reason for step in _block_steps(sequence)}
+    assert reasons["for_invalid.InvalidOPIFConstruction"] == (
+        "block-script-verify-flag-failed (Invalid OP_IF construction)"
+    )
+    assert not any(
+        reason.startswith("mempool-") for reason in reasons.values() if reason
+    )
+
+
+def test_the_signature_goes_before_the_template_s_script_sig(
+    sequence: list[Step],
+) -> None:
+    """Core's `sign_input_legacy` prepends the signature, keeping the rest."""
+    blocks = {step.name: step.block for step in _block_steps(sequence)}
+    tx = blocks["for_invalid.InvalidOPIFConstruction"].transactions[1]
+    script_sig = tx.vin[0].script_sig
+    endifs = BYTE_FROM_OP_CODE_NAME["OP_ENDIF"] * 35
+    assert script_sig.endswith(endifs)
+    assert len(script_sig) > len(endifs)
+
+
+def test_a_block_holding_a_witness_commits_to_it(sequence: list[Step]) -> None:
+    """Core's own `update_block` adds the commitment its witness asks for."""
+    blocks = {step.name: step.block for step in _block_steps(sequence)}
+    block = blocks["for_invalid.ExtraWitness"]
+    assert block.transactions[1].is_segwit
+    assert block.witness_commitment is not None
+    block.assert_valid_witness_commitment()
+    assert not any(
+        step.block.is_segwit
+        for step in _block_steps(sequence)
+        if step.name != "for_invalid.ExtraWitness"
+    )
