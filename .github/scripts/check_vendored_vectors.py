@@ -11,8 +11,9 @@ same grammar `btclib`'s and `btclib-secp256k1`'s copies of this script
 read over their own ledgers. What every copy owes the others is the
 parsing, the `gh` calls, a field's spelling and the arguments this
 takes; this copy departs from none of that. The ledger it is pointed
-at, TF2.md having moved here whole (issue btclib-org/btclib#2220), and
-the wording of its report are its own.
+at, TF2.md having moved here whole (issue btclib-org/btclib#2220), the
+wording of its report, and its skip of an entry carrying a `pattern`
+(below) are its own.
 
 A ledger pins each entry to a repository, a path and a commit, and
 carries a documented manual procedure to re-check one pin. This
@@ -71,6 +72,15 @@ carries but this script did not check is listed in its own report, so
 nothing silently reads as "checked and clean" that was not checked at
 all.
 
+An entry carrying a `pattern` line names a file derived from upstream's
+`path` rather than copied from it. `btclib`'s copy judges such an entry
+by comparing what that pattern derives at upstream's tip with the file
+its heading names. A heading here names a path in Core, and this tree
+holds none of those files, so this copy derives nothing: it reads the
+`pattern` line, as the copies owe each other, and skips under that
+reason an entry it would otherwise check. `tests/tf2_ledger_test.py`
+refuses any skip of an entry of `TF2.md`, so none carries a `pattern`.
+
     uv run --no-project python .github/scripts/check_vendored_vectors.py \
         TF2.md "TF2.md pins behind upstream"
 """
@@ -98,30 +108,33 @@ _TRANSIENT = re.compile(r"HTTP 5\d\d")
 _ATTEMPTS = 3
 
 
-def _gh_output(*args: str) -> str:
+def _gh_bytes(*args: str) -> bytes:
     """Return the stdout of a `gh` call, printing gh's stderr where it fails.
 
     A call failing with a server error is made `_ATTEMPTS` times at
     most, waiting longer before each retry; the last error, or any
-    other, is raised.
+    other, is raised, carrying gh's stderr as text.
     """
     attempt = 0
     while True:
         attempt += 1
         try:
             return subprocess.run(  # noqa: S603
-                [_GH, *args],
-                capture_output=True,
-                check=True,
-                encoding="utf-8",
+                [_GH, *args], capture_output=True, check=True
             ).stdout
         except subprocess.CalledProcessError as error:
-            print(
-                f"gh {' '.join(args)} failed: {error.stderr.strip()}", file=sys.stderr
-            )
-            if attempt == _ATTEMPTS or not _TRANSIENT.search(error.stderr):
-                raise
+            stderr = error.stderr.decode("utf-8", "replace")
+            print(f"gh {' '.join(args)} failed: {stderr.strip()}", file=sys.stderr)
+            if attempt == _ATTEMPTS or not _TRANSIENT.search(stderr):
+                raise subprocess.CalledProcessError(
+                    error.returncode, error.cmd, error.output, stderr
+                ) from error
             time.sleep(5 * attempt)
+
+
+def _gh_output(*args: str) -> str:
+    """Return the stdout of a `gh` call as text, as `_gh_bytes` makes it."""
+    return _gh_bytes(*args).decode("utf-8")
 
 
 # a ledger entry's own ### heading, so a drift report -- and the
@@ -143,7 +156,8 @@ _HEADING = re.compile(r"^### (.+)$", re.MULTILINE)
 # empty `repo`, `path`, `commit` or `ref` fails the same checks an absent one
 # does.
 _FIELD = re.compile(
-    r"^(repo|path|ref|commit|blob|pulled|behind)(?:[ \t]+(.*))?$", re.MULTILINE
+    r"^(repo|path|ref|pattern|commit|blob|pulled|behind)(?:[ \t]+(.*))?$",
+    re.MULTILINE,
 )
 
 
@@ -196,7 +210,9 @@ def _entries_at_tip(ledger: str) -> tuple[list[Entry], list[str]]:
     already decided not to close -- no `behind` line at all, which is
     distinct from that gap and is named as its own reason rather than
     folded into it, or a `behind` line present but empty, closer to a
-    broken block than to either decision and named apart from both.
+    broken block than to either decision and named apart from both. An
+    entry carrying a `pattern` is skipped too, as the module docstring
+    says.
 
     The first is the one the loop below cannot see, walking blocks as it
     does: a heading owning none never enters it. A group heading a finer
@@ -242,6 +258,9 @@ def _entries_at_tip(ledger: str) -> tuple[list[Entry], list[str]]:
             continue
         if not behind.startswith("0"):
             skipped.append(f"{heading} (already documented as behind)")
+            continue
+        if fields.get("pattern", "").strip():
+            skipped.append(f"{heading} (a pattern, and this copy derives nothing)")
             continue
         ref = fields.get("ref")
         entries.append(
