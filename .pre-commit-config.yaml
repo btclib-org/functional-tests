@@ -59,6 +59,16 @@ repos:
         language: pygrep
         entry: '^ *rev: "?v?([0-9]+|[0-9][0-9.]*(a|b|rc|dev)[0-9]+)"?$'
         files: ^\.pre-commit-config\.yaml$
+  # section 4's leading-dash-path is the rule, and says why each key of
+  # the stanza is what it is
+  - repo: local
+    hooks:
+      - id: leading-dash-path
+        name: a path does not begin with a dash
+        language: fail
+        entry: "a hook reads a path beginning with - as its own option: rename it"
+        files: ^-
+        types: []
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
@@ -157,7 +167,7 @@ repos:
   # repairs the very seam the third check exists to name, so a hook
   # reading the file after it would find nothing left to report.
   - repo: https://github.com/btclib-org/.github
-    rev: f88870c9246bf313eb7f200c358b49b0938d89a3  # frozen: v2026.11.14
+    rev: be094615529fe484b2f6b635cb38dd5f0068fd93  # frozen: v2026.11.20
     hooks:
       - id: check-changelog
         args: [--grandfathered, "0"]
@@ -169,16 +179,26 @@ repos:
         args: [--fix]
   # how a link destination is spelled, which markdownlint has no rule for
   # and the documentation build depends on. Section 4 of the
-  # organization's standard is the rule; the same hook in every repository
-  # of the organization (btclib-org/.github#20), there being no shared
-  # hook repository to put it in
+  # organization's standard is the rule, what the script reads and what
+  # it cannot see, and why each tree runs its own copy, which section 14
+  # lists. The pin is the standard's, the version of its test group
   - repo: local
     hooks:
       - id: local-link-prefix
         name: a local markdown link destination begins with ./ or ../
-        language: pygrep
-        entry: |-
-          (?<![`!\[])(?:!?\[(?:[^]]|\]\([^)]*\))*\]\(|^\x20{0,3}\[[^]]+\]:\s*)(?!\.\.?/|#|[A-Za-z][A-Za-z0-9+.-]*:)[^)\s]
+        entry: python .github/scripts/check_link_destinations.py --prefixed --
+        language: python
+        additional_dependencies: [markdown-it-py==4.3.0]
+        types: [markdown]
+        exclude: ^README\.md$
+      # the root README.md links a file of the tree absolutely: section 2
+      # of the standard is the rule, at every tier
+      - id: readme-absolute-link
+        name: the root README.md links a file of the tree absolutely
+        entry: python .github/scripts/check_link_destinations.py --absolute --
+        language: python
+        additional_dependencies: [markdown-it-py==4.3.0]
+        files: ^README\.md$
         types: [markdown]
       - id: no-hyphen-at-end-of-line
         name: a word is not wrapped at its own hyphen
@@ -284,8 +304,11 @@ repos:
         types: [python]
       # section 4 of the standard, its bare-sourcery-skip bullet, is the
       # rule. pygrep reads bytes, so \s and \w are ASCII there and \W
-      # takes in a non-breaking space; a block scalar with no literal
-      # space, as local-link-prefix's, for the same reason
+      # takes in a non-breaking space. The value is one line with no
+      # literal space in it, so that yamllint reads it as a single
+      # unbreakable word, which its line-length rule exempts; and a block
+      # scalar, since a folded one joins its lines with a space, which
+      # would land inside the regex
       - id: bare-sourcery-skip
         name: a sourcery skip names rules, and no tag
         language: pygrep

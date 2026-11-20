@@ -798,10 +798,12 @@ gh api repos/btclib-org/functional-tests/dependabot/secrets --jq .total_count
 ```
 
 **A switch this repository does not set.** `claude-review.yml` calls
-`btclib-org/.github`'s `reusable-claude-review.yml`, whose jobs guard on
-`vars.CLAUDE_REVIEW_ENABLED`; a variable set here would take precedence
-over one of the same name on the organization, so the repository's own
-store is read too:
+`btclib-org/.github`'s `reusable-claude-review.yml`, whose review and
+mention jobs guard on `vars.CLAUDE_REVIEW_ENABLED`; the job that clears
+a new head's reactions runs whatever it says, for the reason that
+workflow's header gives. A variable set here would take precedence over
+one of the same name on the organization, so the repository's own store
+is read too:
 
 ```shell
 gh api repos/btclib-org/functional-tests/actions/variables --jq .total_count

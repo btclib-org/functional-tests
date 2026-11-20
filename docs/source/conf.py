@@ -154,16 +154,15 @@ source_suffix = [".rst", ".md"]
 
 # anchors for h1 to h6, which is what makes a link into a heading of a
 # root markdown file resolve here. Without it myst generates no anchor at
-# all, so a link GitHub and PyPI both follow, the anchor being what those
-# two derive from the heading text, becomes an xref to a target no page
-# has, and -W fails the build. Six is every level markdown heads at,
-# which makes the number a fixed point rather than one re-derived from
-# files that move: section 2 of the organization's standard says so, and
-# names a depth read off this tree's own headings as the rejected
-# alternative. Part of what such a
+# all, so a link GitHub follows, the anchor being what GitHub derives from
+# the heading text, becomes an xref to a target no page has, and -W fails
+# the build. Six is every level markdown heads at, which makes the number
+# a fixed point rather than one re-derived from files that move: section 2
+# of the organization's standard says so, and names a depth read off this
+# tree's own headings as the rejected alternative. Part of what such a
 # re-derivation would read is not this tree's to hold still either --
-# section 14 ports CONTRIBUTING.md's shared half into every repository,
-# so a heading added there moves the depth in each of them at once
+# section 14 ports CONTRIBUTING.md's shared half into every repository, so
+# a heading added there moves the depth in each of them at once
 myst_heading_anchors = 6
 
 # no suppress_warnings, and myst.xref_missing least of all: the transform
@@ -202,12 +201,13 @@ html_theme = "furo"
 # adding SECURITY and RELEASE_NOTES -- each pulled into a *_link.md shim
 # by a myst {include}. The code below reads the include of every page
 # of docs/source, so adding one needs no edit here.
-# Those files are written for the two places that read them unrendered --
-# the GitHub file view and the PyPI long description -- so
-# "./REVIEWING.md" is the correct spelling there and the one links.yml
-# checks, resolving it as a path relative to the file. Sphinx sees them
-# lifted out of the tree that makes it correct, and myst resolves not one
-# of those links.
+# Those files are written for the GitHub file view, which reads them
+# unrendered, so "./REVIEWING.md" is the correct spelling there and the
+# one links.yml checks, resolving it as a path relative to the file. The
+# root README.md links them at BLOB instead, as section 2 of the
+# organization's standard asks at every tier. Sphinx sees them lifted out
+# of the tree that makes a relative link correct, and myst resolves not
+# one of those links.
 #
 # What it emits instead is the reason this needs code rather than a
 # warning filter: a target myst cannot resolve becomes an anchor on the
@@ -242,11 +242,11 @@ html_theme = "furo"
 # renders the link text with no link at all.
 #
 # Not copying the root files into this directory at build time either.
-# README.md links to LICENSE, which is not part of the documentation --
-# no page includes it, which is what decides it -- so copies leave that
-# link dead however many are made; and the copies are generated files in
-# a source tree, which is a second definition of files that already
-# exist.
+# CONTRIBUTING.md links to tests/README.md, which is not part of the
+# documentation -- no page includes it, which is what decides it -- so
+# copies leave that link dead however many are made; and the copies are
+# generated files in a source tree, which is a second definition of files
+# that already exist.
 
 # main, not a permalink pinned to a commit: these are navigation links
 # to files that keep changing, and a reader following one wants the file
