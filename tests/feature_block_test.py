@@ -11,11 +11,16 @@ what a runner relies on before any node reads it.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import pytest
 from btclib.block.genesis import genesis_block
+from btclib.block.limits import MAX_BLOCK_WEIGHT
 from btclib.script.script import BYTE_FROM_OP_CODE_NAME
+from btclib.tx import OutPoint
 
 from btclib_functional_tests.feature_block import (
+    BatchStep,
     BlockStep,
     InvalidateStep,
     MockTimeStep,
@@ -26,17 +31,35 @@ from btclib_functional_tests.feature_block import (
 )
 from btclib_functional_tests.invalid_txs import TEMPLATES
 
+if TYPE_CHECKING:
+    from btclib.block.block import Block
+
 _START = 1_800_000_000
+
+# a re-org short enough to build in a unit run, and long enough that its
+# first chain spends coinbases it saved itself, as `b189` and `b190` do
+_REORG_SIZE = 102
 
 
 @pytest.fixture(scope="module")
 def sequence() -> list[Step]:
     """Return the sequence once for the module: building it signs thousands."""
-    return steps(_START)
+    return steps(_START, reorg_size=_REORG_SIZE)
 
 
 def _block_steps(sequence: list[Step]) -> list[BlockStep]:
     return [step for step in sequence if isinstance(step, BlockStep)]
+
+
+def _sent(sequence: list[Step]) -> list[tuple[str, Block]]:
+    """Return each block sent, a batch's included, with its name, in order."""
+    sent: list[tuple[str, Block]] = []
+    for step in sequence:
+        if isinstance(step, BlockStep):
+            sent.append((step.name, step.block))
+        elif isinstance(step, BatchStep):
+            sent.extend(zip(step.names, step.blocks, strict=True))
+    return sent
 
 
 def test_the_first_block_is_one_second_past_the_start(sequence: list[Step]) -> None:
@@ -57,9 +80,9 @@ def test_a_refused_block_never_becomes_the_tip(sequence: list[Step]) -> None:
 def test_every_block_builds_on_one_sent_before_it(sequence: list[Step]) -> None:
     """No block's parent is unknown to the node when the block arrives."""
     known = {genesis_block("regtest").header.hash}
-    for step in _block_steps(sequence):
-        assert step.block.header.previous_block_hash in known, step.name
-        known.add(step.block.header.hash)
+    for name, block in _sent(sequence):
+        assert block.header.previous_block_hash in known, name
+        known.add(block.header.hash)
 
 
 def test_every_named_hash_is_a_block_sent_before_it(sequence: list[Step]) -> None:
@@ -68,6 +91,8 @@ def test_every_named_hash_is_a_block_sent_before_it(sequence: list[Step]) -> Non
     for step in sequence:
         if isinstance(step, BlockStep):
             sent.add(step.block.header.hash)
+        elif isinstance(step, BatchStep):
+            sent.update(block.header.hash for block in step.blocks)
         elif isinstance(step, TipStep | InvalidateStep):
             assert step.block_hash in sent, step.name
 
@@ -81,7 +106,7 @@ def test_the_clock_is_set_and_given_back(sequence: list[Step]) -> None:
 
 def test_the_same_start_builds_the_same_sequence(sequence: list[Step]) -> None:
     """The fixed key and RFC 6979 leave nothing to chance."""
-    assert steps(_START) == sequence
+    assert steps(_START, reorg_size=_REORG_SIZE) == sequence
 
 
 def test_two_names_share_a_hash_only_where_core_builds_them_to(
@@ -93,8 +118,8 @@ def test_two_names_share_a_hash_only_where_core_builds_them_to(
     apart and this sequence does not, `b2` and `b3` among them.
     """
     names: dict[bytes, set[str]] = {}
-    for step in _block_steps(sequence):
-        names.setdefault(step.block.header.hash, set()).add(step.name)
+    for name, block in _sent(sequence):
+        names.setdefault(block.header.hash, set()).add(name)
     shared = {frozenset(n) for n in names.values() if len(n) > 1}
     assert shared == {
         frozenset({"b56", "b57"}),
@@ -178,3 +203,100 @@ def test_a_block_holding_a_witness_commits_to_it(sequence: list[Step]) -> None:
         for step in _block_steps(sequence)
         if step.name != "for_invalid.ExtraWitness"
     )
+
+
+def _assert_the_reorg(sequence: list[Step], size: int) -> None:
+    """Core's re-org of `size` blocks, as the sequence's last steps.
+
+    The first chain grows from `b88` by `size` blocks of `MAX_BLOCK_WEIGHT`,
+    each the tip; the alternative one by as many in one batch that leaves
+    the tip alone, and one more that takes it; then the first chain
+    takes it back, unasked for one block and asked for the next.
+    """
+    last = 88 + size
+    tail = sequence[-(size + 4) :]
+    assert [type(step) for step in tail] == [
+        *[BlockStep] * size,
+        BatchStep,
+        *[BlockStep] * 3,
+    ]
+    *first_steps, batch, alt_tip, unasked, back = tail
+    first = [step for step in first_steps if isinstance(step, BlockStep)]
+    assert isinstance(batch, BatchStep)
+    assert isinstance(alt_tip, BlockStep)
+    assert isinstance(unasked, BlockStep)
+    assert isinstance(back, BlockStep)
+    b88 = dict(_sent(sequence))["b88"]
+
+    assert [step.name for step in first] == [f"b{i}" for i in range(89, last + 1)]
+    assert batch.names == tuple(f"alt{i}" for i in range(89, last + 1))
+    first_blocks = [step.block for step in first]
+    for chain in (first_blocks, list(batch.blocks)):
+        for parent, block in zip([b88, *chain[:-1]], chain, strict=True):
+            assert block.header.previous_block_hash == parent.header.hash
+    assert all(block.weight == MAX_BLOCK_WEIGHT for block in first_blocks)
+    assert all(step.becomes_tip for step in first)
+    assert not batch.becomes_tip
+
+    assert alt_tip.name == f"alt{last + 1}"
+    assert alt_tip.block.header.previous_block_hash == batch.blocks[-1].header.hash
+    assert alt_tip.becomes_tip
+
+    assert (unasked.name, back.name) == (f"b{last + 1}", f"b{last + 2}")
+    assert unasked.block.header.previous_block_hash == first_blocks[-1].header.hash
+    assert back.block.header.previous_block_hash == unasked.block.header.hash
+    assert (unasked.unrequested, unasked.becomes_tip) == (True, False)
+    assert (back.unrequested, back.becomes_tip) == (False, True)
+
+    for step in [*first, alt_tip, unasked, back]:
+        assert step.reject_reason is None
+        assert not step.disconnects
+
+    # every block but those of the first chain is its coinbase alone
+    for block in [*batch.blocks, alt_tip.block, unasked.block, back.block]:
+        assert len(block.transactions) == 1
+
+
+def test_the_reorg_ends_the_sequence(sequence: list[Step]) -> None:
+    """Core's re-org, at the size the module's sequence asks for."""
+    _assert_the_reorg(sequence, _REORG_SIZE)
+
+
+def test_the_shortest_reorg_is_one_block() -> None:
+    """A re-org of one block keeps Core's shape; one of none is refused."""
+    _assert_the_reorg(steps(_START, reorg_size=1), 1)
+    with pytest.raises(ValueError, match="reorg_size 0 is below one"):
+        steps(_START, reorg_size=0)
+
+
+def test_each_block_of_the_first_chain_is_padded_as_core_pads_it(
+    sequence: list[Step],
+) -> None:
+    """A spend of the oldest saved coinbase, then the padding spending it.
+
+    `b89` spends the coinbase `b89a` tried to, and `b90` the next one
+    saved, `maturitybuffer.32`'s. Once the coinbases saved before the
+    re-org are spent, the first chain spends its own: `b189` spends
+    `b89`'s, and `b190` `b90`'s. The padding spends output 0 of the
+    block's spend with sequence 0, Core's `CTxIn` default, and pays
+    nothing to a push of zeros.
+    """
+    blocks = dict(_sent(sequence))
+
+    def spent_by(name: str) -> OutPoint:
+        return blocks[name].transactions[1].vin[0].prev_out
+
+    def coinbase_of(name: str) -> OutPoint:
+        return OutPoint(blocks[name].transactions[0].id, 0)
+
+    assert spent_by("b89") == spent_by("b89a")
+    assert spent_by("b90") == coinbase_of("maturitybuffer.32")
+    assert spent_by("b189") == coinbase_of("b89")
+    assert spent_by("b190") == coinbase_of("b90")
+    for name in ("b89", "b90"):
+        _, spend, padding = blocks[name].transactions
+        assert padding.vin[0].prev_out == OutPoint(spend.id, 0)
+        assert padding.vin[0].sequence == 0
+        (tx_out,) = padding.vout
+        assert tx_out.value == 0
+        assert set(tx_out.script_pub_key.script[5:]) == {0}

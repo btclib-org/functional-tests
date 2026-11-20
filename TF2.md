@@ -1489,10 +1489,10 @@ no entry here is a `bitcoind only` row, or has its reason in the docstring of
   does without `NODE_BLOOM`.
 - `interface_http.py`: the excessive request size step alone, a wire row and a
   log row ([ISS 5](https://github.com/btclib-org/functional-tests/issues/5)).
-- `feature_block.py`: a smaller claim: Core's sequence without its
-  `LARGE_REORG_SIZE` re-org
-  ([ISS 439](https://github.com/btclib-org/functional-tests/issues/439)),
-  as a body per row, wire and log. The templates of
+- `feature_block.py`: a smaller claim: Core's sequence with a re-org
+  shorter than its `LARGE_REORG_SIZE`, as a body per row, wire and log.
+  The module docstring of `btclib_functional_tests.feature_block` says
+  what the full size is left to. The templates of
   `test/functional/data/invalid_txs.py` are read at the same pin. Skips
   on `peer_timeout`.
 - `feature_prune_stale_fork.py`: Core's claim in full. Skips on `fastprune`:
