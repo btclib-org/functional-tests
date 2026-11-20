@@ -7,21 +7,22 @@
 Read from Core's `test/functional/feature_block.py`: a node is fed a
 sequence of valid and invalid blocks, forks and re-orgs, over one peer,
 and each block's verdict is checked. `btclib_functional_tests.feature_block`
-builds that sequence as data, and its module docstring says what the
-sequence leaves out of Core's file. Each body here feeds the whole
+builds that sequence as data, and its module docstring says where the
+sequence differs from Core's file. Each body here feeds the whole
 sequence to a fresh node over p2p, the way Core's `P2PDataStore` does.
 
 A block is announced by its header, and the peer answers each `getdata`
 with the blocks it has sent on that connection, until one names the
 block announced; a block the node has no reason to ask for is sent
-unasked. Then the body waits for the node to drop the peer where Core
-does, and otherwise for a `ping` round trip, and reads the tip off
-`getbestblockhash`. A new connection follows each drop, and the block
-sent in a non-canonical encoding is followed by one too, as in Core's
-run. Each new connection waits for the node's `getheaders`, as Core's
-`bootstrap_p2p` does. The
-other steps go over RPC: `invalidateblock`, `setmocktime`,
-`getrawmempool` and `gettxout`.
+unasked. A batch is announced by its blocks' headers in one message, and
+answered until a `getdata` names its last block. Then the body waits for
+the node to drop the peer where Core does, and otherwise for a `ping`
+round trip, and reads the tip off `getbestblockhash`. A new connection
+follows each drop, and the block sent in a non-canonical encoding is
+followed by one too, as in Core's run. Each new connection waits for the
+node's `getheaders`, as Core's `bootstrap_p2p` does. The other steps go
+over RPC: `invalidateblock`, `setmocktime`, `getrawmempool` and
+`gettxout`.
 
 The log half asserts besides each refused block's reason in the node's
 own log, as Core's `send_blocks_and_test` does (`Capability.DEBUG_LOG`).
@@ -30,8 +31,11 @@ Each body asks for `Capability.TEST_ACTIVATION_HEIGHT`, for the BIP34
 height the sequence's first block needs, `Capability.INVALIDATE_BLOCK`,
 `Capability.CLOCK` and `Capability.PEER_TIMEOUT`.
 
-What differs from Core's file, beyond what the sequence leaves out:
+What differs from Core's file, beyond what the sequence's module
+docstring lists:
 
+- the re-org at the end of the sequence is `_REORG_SIZE` blocks long,
+  short of Core's `LARGE_REORG_SIZE`;
 - Core's harness starts every node with a `peertimeout` (`write_config`,
   `test_framework/util.py`); here the node is restarted with it, so that
   `CConnman::InactivityCheck` (`src/net.cpp`) does not drop the peer
@@ -62,6 +66,7 @@ from btclib_functional_tests.capability import Capability, require
 from btclib_functional_tests.debug_log import assert_debug_log
 from btclib_functional_tests.feature_block import (
     BIP34_HEIGHT,
+    BatchStep,
     BlockStep,
     CoinStep,
     InvalidateStep,
@@ -78,6 +83,8 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
     from contextlib import AbstractContextManager
     from pathlib import Path
+
+    from btclib.block.block import Block
 
     from btclib_functional_tests.capability import SkipCounts
     from btclib_functional_tests.feature_block import Step
@@ -98,6 +105,12 @@ _BLOCK_SCRIPT_FAILED = "block-script-verify-flag-failed"
 # and the adapters do not: a `peertimeout` under which the moved clock
 # drops no peer as inactive
 _PEER_TIMEOUT = "-peertimeout=999999999"
+
+# the length of the re-org at the end of the sequence: long enough that
+# bitcoind fetches the alternative chain through its block download, as
+# at `LARGE_REORG_SIZE`, rather than on the headers' announcement (its
+# log reads `Large reorg, won't direct fetch`)
+_REORG_SIZE = 33
 
 
 def _debug_log(node: NodeAdapter, skip_counts: SkipCounts) -> Path:
@@ -140,11 +153,16 @@ def _connect(node: NodeAdapter) -> Peer:
     return peer
 
 
+def _block_message(block: Block) -> bytes:
+    """Return the `block` message carrying `block`."""
+    payload = BlockPayload(block, include_witness=True, check_validity=False)
+    return payload.to_message(_MAGIC, check_validity=False).serialize()
+
+
 def _payload(step: BlockStep) -> bytes:
     """Return the `block` message carrying the step's block, or its stand-in."""
     if step.serialized is None:
-        payload = BlockPayload(step.block, include_witness=True, check_validity=False)
-        return payload.to_message(_MAGIC, check_validity=False).serialize()
+        return _block_message(step.block)
     message = Message(_MAGIC, "block", step.serialized, check_validity=False)
     return message.serialize(check_validity=False)
 
@@ -208,6 +226,22 @@ class _DataStore:
         if step.disconnects or step.serialized is not None:
             self.reconnect()
 
+    def feed_batch(self, step: BatchStep) -> None:
+        """Core's own `send_blocks(blocks)`: one announcement, one verdict."""
+        for block in step.blocks:
+            self.blocks[block.header.hash] = _block_message(block)
+        last_hash = step.blocks[-1].header.hash
+        headers = [block.header for block in step.blocks]
+        self.peer.send(Headers(headers, check_validity=False))
+        self._answer_until_asked_for(last_hash)
+        self.peer.sync_with_ping()
+        if step.becomes_tip:
+            wait_until(
+                lambda: self.node.rpc.call("getbestblockhash") == last_hash.hex()
+            )
+        else:
+            assert self.node.rpc.call("getbestblockhash") != last_hash.hex()
+
 
 def _take(store: _DataStore, step: Step, log_path: Path | None) -> None:
     """Take one step: a block over p2p, anything else over RPC."""
@@ -215,6 +249,8 @@ def _take(store: _DataStore, step: Step, log_path: Path | None) -> None:
     match step:
         case BlockStep():
             store.feed(step, log_path)
+        case BatchStep():
+            store.feed_batch(step)
         case TipStep():
             assert node.rpc.call("getbestblockhash") == step.block_hash.hex()
         case InvalidateStep():
@@ -238,7 +274,7 @@ def _run(node: NodeAdapter, log_path: Path | None) -> None:
     assert node.rpc.call("getbestblockhash") == genesis_hash.hex()
     store = _DataStore(node)
     try:
-        for step in steps(int(time.time())):
+        for step in steps(int(time.time()), reorg_size=_REORG_SIZE):
             try:
                 _take(store, step, log_path)
             except Exception as error:

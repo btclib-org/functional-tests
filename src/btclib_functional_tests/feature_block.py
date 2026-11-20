@@ -6,11 +6,11 @@
 
 Read from Core's `test/functional/feature_block.py`, at the pin of its
 row in `TF2.md`'s per-test ledger. `steps` returns the sequence as a list
-of `Step`: each block with the verdict expected of it, and between the
-blocks the other things Core's run does to the node or asks of it.
-Nothing here reaches a node, so a runner can feed the list to a node over
-p2p, as `tests/integration/feature_block_test.py` does, or to a chain in
-process.
+of `Step`: each block, or batch of blocks, with the verdict expected of
+it, and between the blocks the other things Core's run does to the node
+or asks of it. Nothing here reaches a node, so a runner can feed the list
+to a node over p2p, as `tests/integration/feature_block_test.py` does, or
+to a chain in process.
 
 A runner starts its node on regtest, with BIP34 enforced from
 `BIP34_HEIGHT`: Core's own `-testactivationheight=bip34@2`. The first
@@ -28,9 +28,12 @@ same blocks for the same `start_time`.
 
 What differs from Core's file:
 
-- the re-org of `LARGE_REORG_SIZE` blocks, which Core's own
-  `--skipreorg` leaves out, is not in the sequence
-  ([ISS 439](https://github.com/btclib-org/functional-tests/issues/439));
+- the re-org at the end is as long as `steps`'s `reorg_size` asks, Core's
+  `LARGE_REORG_SIZE` where not given. This tree's suites ask for a short
+  one, and the full size is left to btclib-node's slow tier, through the
+  in-process runner
+  [ISS btclib-node#1975](https://github.com/btclib-org/btclib-node/issues/1975)
+  asks for;
 - Core's `DuplicateInput` template holds one input object twice, so
   Core's signature lands in both inputs. Here it is in input 0 alone: the
   node refuses the transaction for its duplicate input before it reads a
@@ -41,7 +44,10 @@ What differs from Core's file:
   every other: the first taken and then invalidated, the second refused;
 - each block is its own step, where Core sends some in one batch and
   checks the tip once after the last. The step says whether each block
-  of a batch becomes the tip.
+  of a batch becomes the tip. The re-org's alternative chain is the
+  exception, one `BatchStep`: the node fetches none of its blocks before
+  it knows the header of the last, the first with as much work as the
+  tip.
 """
 
 from __future__ import annotations
@@ -87,6 +93,8 @@ from btclib_functional_tests.invalid_txs import TEMPLATES
 
 __all__ = [
     "BIP34_HEIGHT",
+    "LARGE_REORG_SIZE",
+    "BatchStep",
     "BlockStep",
     "CoinStep",
     "InvalidateStep",
@@ -100,6 +108,9 @@ __all__ = [
 # the height from which the sequence's chain enforces BIP34, Core's own
 # `-testactivationheight=bip34@2`
 BIP34_HEIGHT = 2
+
+# Core's own length of the re-org at the end of its run
+LARGE_REORG_SIZE = 1088
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -127,6 +138,24 @@ class BlockStep:
     unrequested: bool = False
     disconnects: bool = False
     serialized: bytes | None = None
+
+
+@dataclass(frozen=True, kw_only=True)
+class BatchStep:
+    """Blocks announced together, and what the node makes of the last.
+
+    Core's `send_blocks` of several blocks: one `headers` message carries
+    every block's header, and the node asks for each block.
+
+    :param names: Core's own name for each block.
+    :param blocks: the blocks, each built on the one before it.
+    :param becomes_tip: whether the last block is the node's best block
+        once the node has processed them all. Core's `success`.
+    """
+
+    names: tuple[str, ...]
+    blocks: tuple[Block, ...]
+    becomes_tip: bool
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -195,7 +224,15 @@ class CoinStep:
     confirmations: int
 
 
-type Step = BlockStep | TipStep | InvalidateStep | MockTimeStep | MempoolStep | CoinStep
+type Step = (
+    BlockStep
+    | BatchStep
+    | TipStep
+    | InvalidateStep
+    | MockTimeStep
+    | MempoolStep
+    | CoinStep
+)
 
 # Core's own `COIN` (`test_framework/messages.py`)
 _COIN = 100_000_000
@@ -641,6 +678,16 @@ class _Chain:
                 unrequested=unrequested,
                 disconnects=disconnects,
                 serialized=serialized,
+            )
+        )
+
+    def send_batch(self, names: list[str], *, becomes_tip: bool) -> None:
+        """Core's own `send_blocks(blocks, success)`, as one step."""
+        self.steps.append(
+            BatchStep(
+                names=tuple(names),
+                blocks=tuple(self.blocks[name] for name in names),
+                becomes_tip=becomes_tip,
             )
         )
 
@@ -1598,16 +1645,72 @@ def _resurrection_and_op_return(chain: _Chain, out: list[Tx]) -> None:
     chain.reject("b_cb34", "bad-cb-height")
 
 
+def _large_reorg(chain: _Chain, out: list[Tx], size: int) -> None:
+    """Core's re-org of `LARGE_REORG_SIZE` blocks, here of `size`.
+
+    Each block of the first chain is of `MAX_BLOCK_WEIGHT`, and spends
+    the oldest saved coinbase as it saves its own.
+    """
+    # b88 (31) -> b89 (32) -> ... -> b<last> -> b<last+1> -> b<last+2>
+    #         \-> alt89 -> ... -> alt<last> -> alt<last+1>
+    last = 88 + size
+    chain.move_tip("b88")
+    spend = out[32]
+    for i in range(89, last + 1):
+        name = f"b{i}"
+        block = chain.next_block(name, spend=spend)
+        block = chain.update_block(name, [_padding_tx(block)])
+        _check(block.weight == MAX_BLOCK_WEIGHT, f"{name} is not of MAX_BLOCK_WEIGHT")
+        chain.save_spendable_output()
+        spend = chain.get_spendable_output()
+    for i in range(89, last + 1):
+        chain.send(f"b{i}")
+
+    # an alternative chain of the same length is not a re-org
+    chain.move_tip("b88")
+    alt = [f"alt{i}" for i in range(89, last + 1)]
+    for name in alt:
+        chain.next_block(name)
+    chain.send_batch(alt, becomes_tip=False)
+
+    # one block more is
+    chain.next_block(f"alt{last + 1}")
+    chain.send(f"alt{last + 1}")
+
+    # and two more on the first chain re-org back to it
+    chain.move_tip(f"b{last}")
+    chain.next_block(f"b{last + 1}")
+    chain.send(f"b{last + 1}", becomes_tip=False, unrequested=True)
+    chain.next_block(f"b{last + 2}")
+    chain.send(f"b{last + 2}")
+
+
 def steps(
     start_time: int,
-) -> list[BlockStep | TipStep | InvalidateStep | MockTimeStep | MempoolStep | CoinStep]:
+    *,
+    reorg_size: int = LARGE_REORG_SIZE,
+) -> list[
+    BlockStep
+    | BatchStep
+    | TipStep
+    | InvalidateStep
+    | MockTimeStep
+    | MempoolStep
+    | CoinStep
+]:
     """Return Core's `feature_block` sequence, as steps a runner takes in order.
 
     :param start_time: the unix time the sequence starts at, Core's
         `time.time()`: the first block's timestamp is one second past it,
         and `b48` is three hours past it. A runner gives its node a clock
         near it.
+    :param reorg_size: the length of the re-org at the end, in blocks of
+        `MAX_BLOCK_WEIGHT`; Core's own is `LARGE_REORG_SIZE`.
+    :raises ValueError: `reorg_size` is below one.
     """
+    if reorg_size < 1:
+        err_msg = f"reorg_size {reorg_size} is below one"
+        raise ValueError(err_msg)
     chain = _Chain(start_time)
 
     # a coinbase valid at height 1 only because BIP34 is not yet enforced,
@@ -1691,4 +1794,5 @@ def steps(
     _bloated_and_spends(chain, out)
     _sigops_around_pushes(chain, out)
     _resurrection_and_op_return(chain, out)
+    _large_reorg(chain, out, reorg_size)
     return chain.steps
