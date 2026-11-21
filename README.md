@@ -44,8 +44,9 @@ The unit suite reaches no network and starts no node.
 `tests/integration/` does, against a node a checkout of your own
 provides -- a `bitcoind` built from a Bitcoin Core checkout, an
 interpreter `btclib-node` is installed into, or a `btcd` -- and skips
-cleanly without one. [CONTRIBUTING.md](./CONTRIBUTING.md)'s *The
-environment and the gates* has the commands.
+cleanly without one.
+[CONTRIBUTING.md](https://github.com/btclib-org/functional-tests/blob/main/CONTRIBUTING.md)'s
+*The environment and the gates* has the commands.
 
 A test's skip names a capability that the node it ran against, or the
 wallet factory it was given, does not declare, and the run prints one
@@ -76,10 +77,11 @@ understood by the person who submits it.
 [`CONTRIBUTING.md`](https://github.com/btclib-org/functional-tests/blob/main/CONTRIBUTING.md#working-with-an-llm)
 has the rules.
 
-[CONTRIBUTING.md](./CONTRIBUTING.md) also has the commands that reproduce
-what CI runs. [REVIEWING.md](./REVIEWING.md) is what a pull request is
-answered against. How the organization decides, and who holds which
-role, is its
+[CONTRIBUTING.md](https://github.com/btclib-org/functional-tests/blob/main/CONTRIBUTING.md)
+also has the commands that reproduce what CI runs.
+[REVIEWING.md](https://github.com/btclib-org/functional-tests/blob/main/REVIEWING.md)
+is what a pull request is answered against. How the organization
+decides, and who holds which role, is its
 [GOVERNANCE.md](https://github.com/btclib-org/.github/blob/main/GOVERNANCE.md);
 what it intends to do, and what it deliberately does not, is its
 [ROADMAP.md](https://github.com/btclib-org/.github/blob/main/ROADMAP.md).
@@ -87,7 +89,7 @@ what it intends to do, and what it deliberately does not, is its
 ## Links
 
 - Source: <https://github.com/btclib-org/functional-tests>
-- [CHANGELOG.md](./CHANGELOG.md)
+- [CHANGELOG.md](https://github.com/btclib-org/functional-tests/blob/main/CHANGELOG.md)
 
 ## Status
 

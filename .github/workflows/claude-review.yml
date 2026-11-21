@@ -17,8 +17,8 @@ name: claude-review
 # that gates a merge would make a model's judgement a branch rule.
 #
 # One calling job: a `uses:` job invokes the whole called workflow, so it
-# reaches both the callee's `review` and `mention`, and each declines the
-# events that are not its own.
+# reaches every job of the callee, and each declines the events that are
+# not its own.
 
 on:
   pull_request:
@@ -50,9 +50,9 @@ jobs:
     cache-mode: none
     permissions:
       contents: read
-      pull-requests: write # posting the review, and the reply to a mention
+      pull-requests: write # the review, its reactions, the reply to a mention
       id-token: write # the OIDC token the action mints at its own startup
-    uses: btclib-org/.github/.github/workflows/reusable-claude-review.yml@cb5a79443399980ba717df2dea23dbedf6bdbc3a # v2026.11.12
+    uses: btclib-org/.github/.github/workflows/reusable-claude-review.yml@a96ab77e0b59880c6412f62da26d3f62dfc31e0c # v2026.11.20
     with:
       extra-prompt: |
         This package runs a process, opens an RPC socket and a p2p

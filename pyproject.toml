@@ -102,7 +102,15 @@ harness = [
     "pytest-xdist>=3.8.0",
 ]
 test = [{ include-group = "harness" }]
-lint = ["mypy>=2.3.1", "pre-commit>=4.6.2", "ruff>=0.16.7"]
+lint = [
+    # what mypy reads .github/scripts/check_link_destinations.py against;
+    # the link hooks that run the script install it at the pin of their
+    # own stanza
+    "markdown-it-py>=4.3.0",
+    "mypy>=2.3.1",
+    "pre-commit>=4.6.2",
+    "ruff>=0.16.7",
+]
 # what inspects the distribution before it would be published -- and
 # here nothing is published, so this is a lint of the packaging. Named
 # `check`, not `build`, the name section 1 of btclib-org/.github keeps
@@ -270,7 +278,13 @@ source = ["btclib_functional_tests", "tests", ".github/scripts"]
 # every commit, which is the ratchet reporting the switch rather than a
 # defect. What covers them is the opt-in run, and the module docstrings
 # carry the command -- matching btclib's own `pyproject.toml`
-omit = ["*/site-packages/*", "tests/integration/*"]
+omit = [
+    "*/site-packages/*",
+    "tests/integration/*",
+    # a copy section 14 of the standard compares, tested where its
+    # canonical copy is (section 8 of the standard)
+    ".github/scripts/check_link_destinations.py",
+]
 branch = true
 
 [tool.coverage.report]
@@ -407,6 +421,10 @@ ignore = [
 ".github/scripts/btclib_node_verdict.py" = ["T201"]
 # the btclib-wallet verdict: the btclib-node verdict's own shape
 ".github/scripts/btclib_wallet_verdict.py" = ["T201"]
+# a copy section 14 of the standard keeps byte for byte: what it prints
+# is its report, and its `noqa` is for a rule this tree ignores, which
+# RUF100 would report as unused
+".github/scripts/check_link_destinations.py" = ["RUF100", "T201"]
 "tests/**" = [
     "S101",   # assert
     "S311",   # non-cryptographic random: fine in tests

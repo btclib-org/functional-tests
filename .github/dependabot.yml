@@ -6,7 +6,9 @@
 # block of .pre-commit-config.yaml, already rewrites rev: for every repo:
 # but local and meta, so a second bot on the same pin would only compete
 # with it. A hook whose repo: is local is what autoupdate does not reach:
-# typos moves by a hand edit of its additional_dependencies.
+# typos moves by a hand edit of its additional_dependencies, and the link
+# hooks' markdown-it-py pin moves with the ports of the standard, whose
+# section 4 sets it at the version of its own test group.
 #
 # every pull request here runs the whole merge gate, so each ecosystem
 # groups its updates into a single pull request rather than paying for
